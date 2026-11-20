@@ -1,0 +1,19 @@
+[package]
+name = "pkg2zip-cli"
+description = "Utilidad de línea de comandos pkg2zip (reescritura en Rust)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "pkg2zip"
+path = "src/main.rs"
+
+[dependencies]
+pkg2zip-core.workspace = true
+
+[lints]
+workspace = true

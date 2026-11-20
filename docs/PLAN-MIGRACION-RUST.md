@@ -568,18 +568,18 @@ combinaciones `-x -c9`, `-b -x`, y con/sin `zRIF`. Total ≈ 60–90 ejecuciones
 - [x] Fijar el repositorio por defecto de `gh` al fork propio (`gh repo set-default …`) para no
       apuntar nunca al `upstream` de solo lectura.
 - [ ] Proteger `develop` con `gh api` (PR obligatorio + checks requeridos de `ci.yml`).
-- [ ] Mover C a `legacy/` (sin cambios funcionales); actualizar `makefile`/`build.cmd` a rutas nuevas.
-- [ ] `scripts/build-legacy.ps1|sh`: localizar VS con `vswhere` (o `cc`) y compilar
+- [x] Mover C a `legacy/` (sin cambios funcionales); CI histórico de la etapa C dentro de `legacy/`.
+- [x] `scripts/build-legacy.ps1|sh`: localizar VS con `vswhere` (o `cc`) y compilar
       `legacy/pkg2zip` en `target/legacy/pkg2zip`.
-- [ ] Workspace `Cargo.toml` vacío con los 3 crates y `rust-toolchain.toml`; `cargo build` verde.
-- [ ] `pkg2zip-testkit` mínimo: construye un `vita_app` sintético; comando `gen`.
-- [ ] `scripts/parity.ps1|sh` con la matriz y reporte JSON; primera corrida contra `legacy/`
-      (debe fallar por ausencia de Rust: se marca `--expect-missing`).
-- [ ] CI `ci.yml`: fmt, clippy, test, build release en ubuntu/windows/macos; job `legacy-parity`
-      que compila C y ejecuta el corpus (aún sin Rust, verifica el arnés).
+- [x] Workspace `Cargo.toml` con los 3 crates, `rust-toolchain.toml`, `rustfmt.toml`; `cargo build` verde.
+- [x] `pkg2zip-testkit` mínimo: construye un `vita_app` sintético; comando `gen`.
+- [x] `scripts/parity.ps1|sh` con la matriz y reporte JSON; corrida contra `legacy/` con casos
+      `pending` (Rust aún no desempaqueta).
+- [x] CI `ci.yml`: fmt, clippy, test en ubuntu/windows/macos, job `no-c` y job `parity` que compila
+      el C y ejecuta el corpus.
 - [ ] Validar los jobs Linux de `ci.yml` en local con `act` antes del primer push.
-- [ ] Congelar sincronización con `upstream` (registrar commit en `docs/paridad.md`).
-- [ ] ADR-001..010 en `docs/adr/`.
+- [x] Congelar sincronización con `upstream` (commit base `6ee3df5` en `docs/paridad.md`).
+- [x] ADR-001..010 en `docs/adr/`.
 
 **Compuerta F0:** `cargo build` y `cargo test` verdes; `parity` corre el C sobre el corpus y produce
 reporte; CI verde en 3 SO.
@@ -706,7 +706,7 @@ equivalente; sin `panic`.
 | `fmt` | ubuntu-latest | `cargo fmt --check` |
 | `clippy` | ubuntu-latest | `cargo clippy --all-targets -- -D warnings` |
 | `test` | ubuntu, windows, macos-14 | `cargo test --locked` (unit + integración + testkit) |
-| `msrv` | ubuntu-latest | Compila con la MSRV declarada (`rust-version`) |
+| `msrv` | ubuntu-latest | `cargo check` con la MSRV declarada; se activa en F5 al fijar la política (`rust-version = 1.89`) |
 | `parity` | ubuntu-latest | Compila `legacy/` y ejecuta `scripts/parity.sh` |
 | `no-c` | ubuntu-latest | `cargo tree` sin `*-sys` que compilen C (excepción: `windows-sys`); contenedor `rust:slim` con solo Rust |
 | `deny` | ubuntu-latest | `cargo deny check` (licencias, advisories, bans) |
