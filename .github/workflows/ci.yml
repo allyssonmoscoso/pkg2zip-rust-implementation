@@ -63,12 +63,17 @@ jobs:
       - name: El árbol de dependencias no compila C
         run: |
           set -euo pipefail
-          deps="$(cargo tree --workspace -e normal --prefix none | sed 's/ (\*)$//' | sort -u)"
+          deps="$(cargo tree --workspace -e normal,build --prefix none | sort -u)"
           echo "$deps"
-          offenders="$(echo "$deps" | grep -E -- '-sys v' | grep -vE '^windows-sys v' || true)"
-          if [ -n "$offenders" ]; then
-            echo "::error::Dependencias -sys que pueden compilar C:"
+          # `cc`/`cmake`/`bindgen` son los mecanismos con los que un build.rs compila C.
+          offenders="$(echo "$deps" | grep -E '^(cc|cmake|bindgen) v' || true)"
+          # Crates -sys que no compilan C (binding puros de Rust).
+          sys_crates="$(echo "$deps" | grep -E -- '-sys v' \
+            | grep -vE '^(windows-sys|windows-link|linux-raw-sys) v' || true)"
+          if [ -n "$offenders$sys_crates" ]; then
+            echo "::error::Dependencias que pueden compilar C:"
             echo "$offenders"
+            echo "$sys_crates"
             exit 1
           fi
       - name: Los crates del producto no contienen C
