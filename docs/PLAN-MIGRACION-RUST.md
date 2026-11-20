@@ -790,8 +790,9 @@ solo se validan en GitHub Actions, porque `act` usa contenedores Linux y no emul
     en el tag `v2.6-c-final` y en la historia.
 11. **Protecciones:** `develop` y `master` con PR obligatorio y checks requeridos vía `gh api`
     (rulesets de GitHub); tags protegidos; Dependabot para crates (con `cargo update` revisado).
-12. **Trazabilidad:** el backlog de §8 se refleja en issues/milestones de GitHub con `gh issue
-    create` (un issue por tarea, etiquetas `fase:FN` y `area:*`), y cada PR referencia su issue.
+12. **Trazabilidad:** habilitar Issues en el fork (hoy están **deshabilitados**, `gh issue list`
+    devuelve "repository has disabled issues") y reflejar el backlog de §8 con `gh issue create`
+    (un issue por tarea, etiquetas `fase:FN` y `area:*`); cada PR referencia su issue.
 
 ---
 
