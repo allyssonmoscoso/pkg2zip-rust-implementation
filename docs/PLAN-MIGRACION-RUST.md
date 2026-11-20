@@ -139,10 +139,18 @@ Otros artefactos: `makefile` (gcc/clang), `build.cmd`/`build32.cmd` (MSVC con ru
 | gcc/clang/cmake/make/nmake | **Ausentes** del `PATH` | El build C de referencia debe hacerse con MSVC vía `VsDevCmd` |
 | Visual Studio | 2026 Community (`C:\Program Files\Microsoft Visual Studio\18\Community`) + Windows SDK | `build.cmd` actual (ruta fija a VS2017) está roto; hay que localizar VS con `vswhere` |
 | `python` | Disponible (Windows Store shim) | Sirve para validar ZIPs/CSOs en pruebas, no como dependencia del producto |
+| `gh` (GitHub CLI) | 2.105.0, sesión de `allyssonmoscoso` (scopes `repo`, `workflow`, `gist`, `read:org`) | Push, PRs, protección de ramas, issues y releases sin salir de la terminal |
+| `act` + Docker | `act` 0.2.98; Docker 29.9.3 operativo | Ejecutar en local los jobs **Linux** de los workflows antes de empujar |
+| Remoto `upstream` | `lusid1/pkg2zip` (proyecto original, sin permisos de escritura) | `gh` resolvía `upstream` por defecto; se fijó `gh repo set-default allyssonmoscoso/pkg2zip-rust-implementation` |
 
 **Conclusión:** el entorno permite construir el binario C de referencia (MSVC) y el proyecto Rust.
-El plan debe hacer que el build C de referencia sea *opcional y aislado* (`legacy/`), porque el
-objetivo final es no necesitar compilador de C.
+El build C de referencia debe ser *opcional y aislado* (`legacy/`), porque el objetivo final es no
+necesitar compilador de C.
+
+**Gestión del repositorio:** todas las operaciones de GitHub se hacen con `gh` (rama por defecto
+fijada al fork propio con `gh repo set-default`); `git` se usa solo para el árbol local. `act` cubre
+los jobs Linux con contenedores; los runners Windows/macOS **no** se pueden emular, así que la
+validación de esos SO queda en GitHub Actions (ver §9.1).
 
 ---
 
@@ -556,7 +564,10 @@ combinaciones `-x -c9`, `-b -x`, y con/sin `zRIF`. Total ≈ 60–90 ejecuciones
 
 ### F0 — Preparación y red de seguridad (2 días)
 
-- [ ] Crear `develop` desde `master` (hecho) y proteger la rama en GitHub (PR obligatorio, CI).
+- [x] Crear `develop` desde `master` y empujarla a `origin` con seguimiento (`git push -u origin develop`).
+- [x] Fijar el repositorio por defecto de `gh` al fork propio (`gh repo set-default …`) para no
+      apuntar nunca al `upstream` de solo lectura.
+- [ ] Proteger `develop` con `gh api` (PR obligatorio + checks requeridos de `ci.yml`).
 - [ ] Mover C a `legacy/` (sin cambios funcionales); actualizar `makefile`/`build.cmd` a rutas nuevas.
 - [ ] `scripts/build-legacy.ps1|sh`: localizar VS con `vswhere` (o `cc`) y compilar
       `legacy/pkg2zip` en `target/legacy/pkg2zip`.
@@ -566,6 +577,7 @@ combinaciones `-x -c9`, `-b -x`, y con/sin `zRIF`. Total ≈ 60–90 ejecuciones
       (debe fallar por ausencia de Rust: se marca `--expect-missing`).
 - [ ] CI `ci.yml`: fmt, clippy, test, build release en ubuntu/windows/macos; job `legacy-parity`
       que compila C y ejecuta el corpus (aún sin Rust, verifica el arnés).
+- [ ] Validar los jobs Linux de `ci.yml` en local con `act` antes del primer push.
 - [ ] Congelar sincronización con `upstream` (registrar commit en `docs/paridad.md`).
 - [ ] ADR-001..010 en `docs/adr/`.
 
@@ -700,6 +712,10 @@ equivalente; sin `panic`.
 | `deny` | ubuntu-latest | `cargo deny check` (licencias, advisories, bans) |
 | `fuzz-smoke` | ubuntu-latest | 60 s por target (no bloqueante en PR) |
 
+Los jobs Linux deben ser autosuficientes (no depender de un job Windows/macOS) para poder
+reproducirlos en local con `act`; los jobs `windows`/`macos` se mantienen delgados (test + build) y
+solo se validan en GitHub Actions, porque `act` usa contenedores Linux y no emula esos runners.
+
 ### 9.2 Release (`release.yml`, al empujar tag `v*`)
 
 | Target | Runner | Artefacto |
@@ -751,21 +767,31 @@ equivalente; sin `panic`.
 
 ## 11. Flujo de trabajo en `develop`
 
-1. **Rama:** `develop` es la rama de integración. `master` queda intacta (C) hasta F5.
-2. **Ramas de feature:** `feat/f1-crypto`, `feat/f2-zip`, ... desde `develop`; PR a `develop`.
-3. **Commits:** Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`).
+1. **Rama:** `develop` es la rama de integración y ya está publicada en `origin` con seguimiento.
+   `master` queda intacta (C) hasta F5.
+2. **Repositorio por defecto:** `gh repo set-default allyssonmoscoso/pkg2zip-rust-implementation`
+   (hecho). Sin esto `gh` resuelve `upstream` (`lusid1/pkg2zip`, solo lectura) porque es el otro
+   remoto configurado.
+3. **Ramas de feature:** `feat/f1-crypto`, `feat/f2-zip`, ... desde `develop`; PR a `develop` con
+   `gh pr create --base develop --fill --draft`.
+4. **Commits:** Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`).
    Un commit = un cambio coherente y compilable.
-4. **PR:** plantilla con checklist (tests, clippy, docs, paridad si aplica); revisión obligatoria
-   (aunque sea self-review documentada) y CI verde. Squash merge.
-5. **Definition of done por PR:** `cargo fmt`, `cargo clippy -D warnings`, `cargo test`,
+5. **Antes de empujar:** `cargo fmt`, `cargo clippy -D warnings`, `cargo test` y, si el cambio toca
+   workflows, `act -j <job-linux>` para no gastar ciclos de Actions.
+6. **PR:** plantilla con checklist (tests, clippy, docs, paridad si aplica); `gh pr checks --watch`
+   para esperar el CI; squash merge con `gh pr merge --squash --delete-branch`.
+7. **Definition of done por PR:** `cargo fmt`, `cargo clippy -D warnings`, `cargo test`,
    `scripts/parity` (si toca dominio), docs actualizadas.
-6. **Código C:** prohibido añadir features al C durante la migración; solo fixes críticos de
+8. **Código C:** prohibido añadir features al C durante la migración; solo fixes críticos de
    seguridad, y siempre replicados en Rust.
-7. **Sync upstream:** congelado hasta 3.0.0; se documenta el commit base en `docs/paridad.md`.
-8. **Release:** en F5, PR `develop → master` con squash, tag `v3.0.0`; el C queda solo en el tag
-   `v2.6-c-final` y en la historia.
-9. **Protecciones:** `develop` y `master` con PR obligatorio; tags protegidos; Dependabot para crates
-   (con `cargo update` revisado).
+9. **Sync upstream:** congelado hasta 3.0.0; se documenta el commit base en `docs/paridad.md`.
+10. **Release:** en F5, PR `develop → master` con squash, tag `v3.0.0`, release con
+    `gh release create v3.0.0 --generate-notes` y los artefactos de `release.yml`; el C queda solo
+    en el tag `v2.6-c-final` y en la historia.
+11. **Protecciones:** `develop` y `master` con PR obligatorio y checks requeridos vía `gh api`
+    (rulesets de GitHub); tags protegidos; Dependabot para crates (con `cargo update` revisado).
+12. **Trazabilidad:** el backlog de §8 se refleja en issues/milestones de GitHub con `gh issue
+    create` (un issue por tarea, etiquetas `fase:FN` y `area:*`), y cada PR referencia su issue.
 
 ---
 
@@ -860,6 +886,21 @@ pwsh ./scripts/parity.ps1 -Corpus ./target/corpus -Report ./target/parity.json
 cargo build --release --locked --target x86_64-pc-windows-msvc
 ```
 
+```bash
+# GitHub con gh (cuenta enlazada: allyssonmoscoso)
+gh auth status
+gh repo set-default allyssonmoscoso/pkg2zip-rust-implementation
+gh pr create --base develop --fill --draft
+gh pr checks --watch
+gh pr merge --squash --delete-branch
+gh release create v3.0.0 --generate-notes dist/*
+
+# CI local con act (solo jobs Linux)
+act -l
+act -j fmt  -P ubuntu-latest=catthehacker/ubuntu:act-latest
+act -j test -P ubuntu-latest=catthehacker/ubuntu:act-latest
+```
+
 ## Anexo D — Referencias
 
 - Formato PKG PS3/Vita: <https://www.psdevwiki.com/ps3/PKG_files>, <https://wiki.henkaku.xyz/vita/Packages>
@@ -877,3 +918,4 @@ cargo build --release --locked --target x86_64-pc-windows-msvc
 | Fecha | Cambio |
 |---|---|
 | 2026-11-20 | Versión inicial del plan en la rama `develop` |
+| 2026-11-20 | `develop` publicada en `origin`; flujo de trabajo con `gh` (PR, checks, releases, protección) y validación local de jobs Linux con `act` |
