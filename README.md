@@ -1,5 +1,9 @@
 # pkg2zip
 
+> **Migración a Rust en curso (rama `develop`).** La implementación C 2.6 vive ahora en
+> [`legacy/`](legacy/README.md) y se eliminará en la versión 3.0.0; `master` sigue siendo la versión
+> C estable. Plan completo: [`docs/PLAN-MIGRACION-RUST.md`](docs/PLAN-MIGRACION-RUST.md).
+
 [![Travis CI Build Status][img_travis]][travis] [![AppVeyor Build Status][img_appveyor]][appveyor] [![Downloads][img_downloads]][downloads] [![Release][img_latest]][latest] [![License][img_license]][license]
 
 Utility that decrypts PlayStation Vita pkg file and creates zip package. Supported pkg files - main application, DLC, patch, theme and PSM files. Also supports PSX and PSP pkg files for use with [Adrenaline][].
