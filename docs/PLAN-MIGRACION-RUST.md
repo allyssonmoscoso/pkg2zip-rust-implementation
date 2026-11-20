@@ -5,7 +5,7 @@
 | Documento | Plan de migración completa a Rust |
 | Rama de trabajo | `develop` (creada desde `master` en `6ee3df5`) |
 | Versión objetivo | `pkg2zip 3.0.0` (reescritura; reemplaza a 2.6) |
-| Estado | Propuesta para aprobación — **no se ha escrito código Rust todavía** |
+| Estado | **F0 completada** (scaffolding, `legacy/` congelado, arnés de paridad y CI). F1 en curso |
 | Fecha | 2026-11-20 |
 | Alcance | Reemplazar el 100 % del C por Rust, sin dependencia de compilador de C, con binarios para Windows/Linux/macOS y paridad funcional con 2.6 |
 
@@ -577,7 +577,7 @@ combinaciones `-x -c9`, `-b -x`, y con/sin `zRIF`. Total ≈ 60–90 ejecuciones
       `pending` (Rust aún no desempaqueta).
 - [x] CI `ci.yml`: fmt, clippy, test en ubuntu/windows/macos, job `no-c` y job `parity` que compila
       el C y ejecuta el corpus.
-- [ ] Validar los jobs Linux de `ci.yml` en local con `act` antes del primer push.
+- [x] Validar los jobs Linux de `ci.yml` en local con `act` (`fmt` y `clippy` en verde).
 - [x] Congelar sincronización con `upstream` (commit base `6ee3df5` en `docs/paridad.md`).
 - [x] ADR-001..010 en `docs/adr/`.
 
@@ -919,4 +919,5 @@ act -j test -P ubuntu-latest=catthehacker/ubuntu:act-latest
 | Fecha | Cambio |
 |---|---|
 | 2026-11-20 | Versión inicial del plan en la rama `develop` |
-| 2026-11-20 | `develop` publicada en `origin`; flujo de trabajo con `gh` (PR, checks, releases, protección) y validación local de jobs Linux con `act` |
+| 2026-11-20 | develop publicada en origin; flujo de trabajo con gh (PR, checks, releases, protección) y validación local de jobs Linux con ct |
+| 2026-11-20 | F0 ejecutada: C congelado en legacy/, workspace Rust, testkit + arnés de paridad, CI ci.yml, ADR-001..010 |
