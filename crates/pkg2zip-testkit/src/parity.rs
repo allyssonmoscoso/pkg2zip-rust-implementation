@@ -222,6 +222,17 @@ pub fn run(options: &Options) -> Result<Summary> {
         .canonicalize()
         .map_err(|e| format!("corpus inválido {}: {e}", options.corpus.display()))?;
 
+    // Los binarios se canonicalizan porque el proceso hijo cambia de directorio de trabajo:
+    // en Unix una ruta relativa se resolvería dentro del directorio temporal y fallaría.
+    let legacy = options
+        .legacy
+        .canonicalize()
+        .map_err(|e| format!("binario C inválido {}: {e}", options.legacy.display()))?;
+    let rust = options
+        .rust
+        .canonicalize()
+        .map_err(|e| format!("binario Rust inválido {}: {e}", options.rust.display()))?;
+
     let mut fixtures: Vec<PathBuf> = Vec::new();
     for entry in fs::read_dir(&corpus)? {
         let entry = entry?;
@@ -247,30 +258,30 @@ pub fn run(options: &Options) -> Result<Summary> {
             let legacy_dir = TempDir::new()?;
             let rust_dir = TempDir::new()?;
 
-            let legacy = run_bin(&options.legacy, case.args, fixture, legacy_dir.path())?;
-            let rust = run_bin(&options.rust, case.args, fixture, rust_dir.path())?;
+            let legacy_out = run_bin(&legacy, case.args, fixture, legacy_dir.path())?;
+            let rust_out = run_bin(&rust, case.args, fixture, rust_dir.path())?;
 
             let mut details = Vec::new();
             let mut warnings = Vec::new();
 
-            let status = if is_pending(&rust) {
+            let status = if is_pending(&rust_out) {
                 Status::Pending
-            } else if legacy.code != rust.code {
+            } else if legacy_out.code != rust_out.code {
                 details.push(format!(
                     "exit code: C={:?} Rust={:?}",
-                    legacy.code, rust.code
+                    legacy_out.code, rust_out.code
                 ));
-                if !rust.stderr.is_empty() {
-                    details.push(format!("stderr Rust: {}", rust.stderr.trim()));
+                if !rust_out.stderr.is_empty() {
+                    details.push(format!("stderr Rust: {}", rust_out.stderr.trim()));
                 }
                 Status::Fail
-            } else if legacy.code == Some(0) {
+            } else if legacy_out.code == Some(0) {
                 if case.name == "list" {
-                    if legacy.stdout != rust.stdout {
+                    if legacy_out.stdout != rust_out.stdout {
                         details.push(format!(
                             "stdout distinto: C={:?} Rust={:?}",
-                            legacy.stdout.trim_end(),
-                            rust.stdout.trim_end()
+                            legacy_out.stdout.trim_end(),
+                            rust_out.stdout.trim_end()
                         ));
                         Status::Fail
                     } else {
@@ -284,7 +295,7 @@ pub fn run(options: &Options) -> Result<Summary> {
                     }
                     let mut diffs = diff_snapshots(&left, &right);
                     if diffs.is_empty() {
-                        if legacy.stdout != rust.stdout {
+                        if legacy_out.stdout != rust_out.stdout {
                             warnings.push("stdout distinto (se endurece en F2)".to_owned());
                         }
                         Status::Pass
@@ -295,7 +306,7 @@ pub fn run(options: &Options) -> Result<Summary> {
                 }
             } else {
                 // Ambos fallan con el mismo código: por ahora se acepta.
-                if legacy.stderr != rust.stderr {
+                if legacy_out.stderr != rust_out.stderr {
                     warnings.push("stderr distinto en caso de error".to_owned());
                 }
                 Status::Pass
@@ -317,8 +328,8 @@ pub fn run(options: &Options) -> Result<Summary> {
 
     let summary = Summary {
         tool_version: env!("CARGO_PKG_VERSION").to_owned(),
-        legacy: options.legacy.display().to_string(),
-        rust: options.rust.display().to_string(),
+        legacy: legacy.display().to_string(),
+        rust: rust.display().to_string(),
         cases,
         passed,
         pending,
