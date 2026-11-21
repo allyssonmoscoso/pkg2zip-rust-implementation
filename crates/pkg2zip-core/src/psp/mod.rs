@@ -1085,6 +1085,7 @@ mod tests {
     fn cso_roundtrip_preserves_iso() {
         // El sink de archivos exige rutas relativas (protección contra traversal), así que el test
         // usa un directorio relativo al crate y lo limpia al terminar.
+        let _guard = crate::plat::file::CWD_LOCK.lock().expect("cwd lock");
         let dir = std::path::PathBuf::from(format!("cso-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("dir");
         let path = dir.join("out.cso");

@@ -270,6 +270,7 @@ name = "pkg2zip-testkit"
 version = "3.0.0"
 dependencies = [
  "flate2",
+ "miniz_oxide",
  "pkg2zip-core",
  "serde",
  "serde_json",

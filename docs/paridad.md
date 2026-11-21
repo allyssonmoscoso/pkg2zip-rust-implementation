@@ -160,6 +160,36 @@ fijo `C = P ^ K(CMAC(C))` que impone el MAC del contenedor; eso solo es viable c
 o con las claves de firma. La lógica está portada y la cripto validada con vectores del C; cuando
 haya una muestra se añadirá a `testdata/psp/` (gitignored) y se activará la paridad de ISO/CSO/EDAT.
 
+## Baseline F4 (2026-11-20)
+
+F4 completa PSM y el barrido de bordes. Corpus de **12 fixtures** y **92 casos**:
+
+| Bloque | Casos | Fixtures |
+|---|---|---|
+| `list`, `extract`, `zip` | todos | todos |
+| `zrif`, `zrif-bin`, `zrif-mismatch` | con work.bin | APP/DLC/THEME/PSM/PSX (no PATCH/PSP/PS3) |
+| `psp-pbp` (`-p`) | todos | solo cambia en PSP |
+| `no-bgdl` (`-b -x`) | todos | solo cambia en temas |
+| `quiet` (`-q -x`) | todos | ninguno |
+| `android` (`-a -x`) | todos | solo cambia en PSM |
+
+Resultado: `92 passed, 0 pending, 0 failed`.
+
+Cubierto: PSM normal y Android, `content_id`, `pm.dat`, `FAKE.rif`, PDB bgdl, títulos con `:`,
+salto de línea y UTF-8, nombre de 120 bytes, archivo vacío, `install_directory`, zRIF `.bin`,
+`CONTENT_ID` distinto (mismo error en ambos binarios), firma inválida, `total_size` inflado y tipo
+no soportado.
+
+Detalles de paridad descubiertos:
+
+- El C recorta los nombres de PSM con `name + 9` (no con `"content/"`, que son 8); se replica el
+  offset exacto para que el árbol coincida.
+- El decodificador base64 del C tiene un caso límite con longitudes no múltiplo de 4; los zRIF de
+  prueba se comprimen de verdad (con `miniz_oxide`) para que quepan en `raw[1024]` del C.
+- Nombres de 1023 bytes no se prueban end-to-end: el binario C falla en Windows por `MAX_PATH`;
+  el límite se valida con tests unitarios.
+- Los caminos con PSAR/PGD reales (ISO/CSO/EDAT) siguen esperando una muestra del mantenedor
+  (ver F3).
 ## Congelación de `upstream`
 
 - Repositorio original: <https://github.com/lusid1/pkg2zip>
@@ -172,5 +202,5 @@ haya una muestra se añadirá a `testdata/psp/` (gitignored) y se activará la p
 |---|---|
 | F2 | ZIP (entradas + CRC), stdout estricto en `-x`, fixtures APP/PATCH/DLC/THEME y zRIF |
 | F3 | PSP `-p`, PSX (DOCUMENT.DAT/texture.enc/`.rif`) y PS3; cripto PSP validada con vectores golden |
-| F4 | Todos los tipos y flags (`-b`, `-p`, `-d`, `-a`, `-cN`), errores y stderr |
+| F4 | PSM/Android, `-b`, `-q`, zRIF `.bin`/mismatch, errores y matriz de 92 casos |
 | F5 | Matriz final como *gate* de release |

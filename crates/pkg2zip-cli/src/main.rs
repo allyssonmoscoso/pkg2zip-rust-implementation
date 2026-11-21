@@ -17,6 +17,7 @@ use pkg2zip_core::pkg::meta::META_INSTALL_DIRECTORY;
 use pkg2zip_core::pkg::naming::{self, Naming};
 use pkg2zip_core::pkg::{HEADER_TOTAL, Kind, MetaBlock, MetaInfo, PkgHeader, region, sfo};
 use pkg2zip_core::plat::{DataFile, Ui};
+use pkg2zip_core::psm::PsmContext;
 use pkg2zip_core::psp::{self, PspContext, PspOptions};
 use pkg2zip_core::vita::{self, VitaContext};
 use pkg2zip_core::zrif::{rif_load, zrif_decode};
@@ -106,7 +107,8 @@ fn run(config: &Config) -> Result<Outcome> {
     let base_kind = Kind::from_content_type(content_type)?;
 
     match base_kind {
-        Kind::VitaApp | Kind::VitaDlc | Kind::VitaPsm | Kind::VitaTheme | Kind::VitaPatch => {
+        Kind::VitaPsm => unpack_psm(config, &pkg, &header, &info, &mut ui),
+        Kind::VitaApp | Kind::VitaDlc | Kind::VitaTheme | Kind::VitaPatch => {
             unpack_vita(config, &pkg, &header, &info, base_kind, &mut ui)
         }
         Kind::Psp | Kind::PspTheme | Kind::Psx | Kind::Ps3 => {
@@ -215,6 +217,93 @@ fn unpack_vita(
     }
 
     Ok(Outcome::Done)
+}
+
+fn unpack_psm(
+    config: &Config,
+    pkg: &DataFile,
+    header: &PkgHeader,
+    info: &MetaInfo,
+    ui: &mut ConsoleUi,
+) -> Result<Outcome> {
+    let keys = derive_keys(header.key_type, header.hdr_type, &header.iv)?;
+    let content_id = header_content_id(header);
+    let context = PsmContext {
+        pkg,
+        header,
+        info,
+        keys,
+        content_id,
+        zrif: config.zrif.as_deref(),
+    };
+    let rif = pkg2zip_core::psm::load_rif(&context)?;
+    let id = context.id()?.to_owned();
+
+    let naming = Naming {
+        kind: Kind::VitaPsm,
+        title: "",
+        id: &id,
+        region: region(&id),
+        app_ver: "",
+        content_type: info.content_type.unwrap_or(0),
+        install_directory: None,
+        dlc_id: "",
+        category: "",
+    };
+    let root = naming::root_name(&naming);
+
+    if config.verbose {
+        ui.info("[*] unpacking Vita PSM");
+    }
+
+    if config.listing {
+        if !config.zipped {
+            return Err(Error::Corrupt(
+                "Listing option without creating zip is useless",
+            ));
+        }
+        println!("{root}.zip");
+        return Ok(Outcome::Done);
+    }
+
+    let name = if config.zipped {
+        format!("{root}.zip")
+    } else {
+        root.clone()
+    };
+    if config.verbose {
+        if config.zipped {
+            ui.info(&format!("[*] creating '{name}' archive"));
+        } else {
+            ui.info(&format!("[*] unpacking '{name}' to directory"));
+        }
+    }
+
+    let mut sink = Sink::create(&name, config.zipped)?;
+    pkg2zip_core::psm::unpack(
+        &context,
+        config.android,
+        config.zipped,
+        rif.as_deref(),
+        &mut sink,
+        ui,
+    )?;
+    sink.finish()?;
+
+    if config.verbose {
+        ui.info("[*] done!");
+    }
+
+    Ok(Outcome::Done)
+}
+
+fn header_content_id(header: &PkgHeader) -> String {
+    let end = header
+        .content_id
+        .iter()
+        .position(|&byte| byte == 0)
+        .unwrap_or(header.content_id.len());
+    String::from_utf8_lossy(&header.content_id[..end]).into_owned()
 }
 
 fn unpack_psp_family(

@@ -5,7 +5,7 @@
 | Documento | Plan de migración completa a Rust |
 | Rama de trabajo | `develop` (creada desde `master` en `6ee3df5`) |
 | Versión objetivo | `pkg2zip 3.0.0` (reescritura; reemplaza a 2.6) |
-| Estado | **F3 completada** (PSP/PSX/PS3 portados; paridad 29/29). Siguiente: F4 (PSM y bordes) |
+| Estado | **F4 completada** (PSM, casos límite y matriz de 92 casos). Siguiente: F5 (release 3.0.0) |
 | Fecha | 2026-11-20 |
 | Alcance | Reemplazar el 100 % del C por Rust, sin dependencia de compilador de C, con binarios para Windows/Linux/macOS y paridad funcional con 2.6 |
 
@@ -637,14 +637,16 @@ muestra real.
 
 ### F4 — PSM, bordes y barrido de paridad (3 días)
 
-- [ ] PSM (`0x18`/`0x1d`), `RO/RW`, `runtime`, `content_id`, `pm.dat`, `-a` (Android).
-- [ ] Tema Vita bgdl completo (PDB) y `-b`.
-- [ ] Casos límite: títulos UTF-8/`:`/`\n`, nombres de 1023, archivos vacíos, `install_directory`,
-      `zRIF .bin`, `content_id` distinto, PKG truncado, firma inválida, tipo no soportado.
-- [ ] Barrido total de la matriz (≈ 90 corridas) y `docs/paridad.md` con resultados.
+- [x] PSM (`0x18`/`0x1d`): `psm/<id>/RO|RW`, `runtime`, `content_id`, `pm.dat`, `FAKE.rif` y `-a`.
+- [x] Tema Vita bgdl completo (PDB) y `-b` (caso `no-bgdl` del arnés).
+- [x] Casos límite: título UTF-8/`:`/`\n`, nombre largo (120 bytes; 1023 no cabe en el `MAX_PATH`
+      del C en Windows), archivo vacío, `install_directory`, zRIF `.bin`, `content_id` distinto,
+      firma inválida, PKG truncado y tipo no soportado.
+- [x] Barrido de matriz: **92 casos** con 12 fixtures (`list`, `extract`, `zip`, `zrif`, `zrif-bin`,
+      `zrif-mismatch`, `psp-pbp`, `no-bgdl`, `quiet`, `android`).
+- [x] Mensajes de error idénticos (incluida la comprobación de `total_size`).
 
-**Compuerta F4:** matriz completa sin diferencias; todos los errores devuelven código 1 con mensaje
-equivalente; sin `panic`.
+**Compuerta F4:** 92/92 sin diferencias; errores con código 1 y stderr equivalente; sin `panic`.
 
 ### F5 — Multiplataforma, documentación y retirada del C (3 días)
 
@@ -937,3 +939,4 @@ act -j test -P ubuntu-latest=catthehacker/ubuntu:act-latest
 | 2026-11-20 | F1 ejecutada: AES/CTR/CMAC/PSP-AES, CRC/Adler, port de `puff` + zRIF y parsers PKG/SFO |
 | 2026-11-20 | F2 ejecutada: ZIP/ZIP64, CLI compatible, layouts APP/PATCH/DLC/THEME, work.bin, extras y PDB; paridad 15/15 |
 | 2026-11-20 | F3 ejecutada: PSP/PSX/PS3, ISO/CSO, LZRC, EDAT/KEYS.BIN, tema PSP; paridad 29/29 |
+| 2026-11-20 | F4 ejecutada: PSM/Android, casos límite, zRIF `.bin`/mismatch y matriz de 92 casos |

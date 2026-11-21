@@ -91,37 +91,70 @@ pub struct Options {
     pub report: PathBuf,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ZrifSource {
+    None,
+    Text,
+    Bin,
+    Mismatch,
+}
+
 struct Case {
     name: &'static str,
     args: &'static [&'static str],
-    with_zrif: bool,
+    zrif: ZrifSource,
 }
 
 const CASES: &[Case] = &[
     Case {
         name: "list",
         args: &["-l"],
-        with_zrif: false,
+        zrif: ZrifSource::None,
     },
     Case {
         name: "extract",
         args: &["-x"],
-        with_zrif: false,
+        zrif: ZrifSource::None,
     },
     Case {
         name: "zip",
         args: &[],
-        with_zrif: false,
+        zrif: ZrifSource::None,
     },
     Case {
         name: "zrif",
         args: &["-x"],
-        with_zrif: true,
+        zrif: ZrifSource::Text,
+    },
+    Case {
+        name: "zrif-bin",
+        args: &["-x"],
+        zrif: ZrifSource::Bin,
+    },
+    Case {
+        name: "zrif-mismatch",
+        args: &["-x"],
+        zrif: ZrifSource::Mismatch,
     },
     Case {
         name: "psp-pbp",
         args: &["-p"],
-        with_zrif: false,
+        zrif: ZrifSource::None,
+    },
+    Case {
+        name: "no-bgdl",
+        args: &["-b", "-x"],
+        zrif: ZrifSource::None,
+    },
+    Case {
+        name: "quiet",
+        args: &["-q", "-x"],
+        zrif: ZrifSource::None,
+    },
+    Case {
+        name: "android",
+        args: &["-a", "-x"],
+        zrif: ZrifSource::None,
     },
 ];
 
@@ -239,6 +272,9 @@ fn case_applies(case: &Case, fixture: &str) -> bool {
         matches!(case.name, "list" | "psp-pbp")
     } else if fixture.starts_with("ps3_") {
         matches!(case.name, "list" | "extract" | "zip")
+    } else if fixture.starts_with("psx_") && case.name == "zrif-bin" {
+        // El C no admite `.bin` para PSX (solo zRIF), así que este caso no aplica.
+        false
     } else {
         true
     }
@@ -339,14 +375,29 @@ pub fn run(options: &Options) -> Result<Summary> {
             let legacy_dir = TempDir::new()?;
             let rust_dir = TempDir::new()?;
 
-            let zrif_text = if case.with_zrif {
-                let path = fixture.with_extension("zrif");
-                match fs::read_to_string(&path) {
-                    Ok(text) => Some(text.trim().to_owned()),
-                    Err(_) => continue, // el fixture no tiene zRIF (p. ej. PATCH)
+            let zrif_text = match case.zrif {
+                ZrifSource::None => None,
+                ZrifSource::Text | ZrifSource::Mismatch => {
+                    let path = if case.zrif == ZrifSource::Text {
+                        fixture.with_extension("zrif")
+                    } else {
+                        let stem = fixture
+                            .file_stem()
+                            .map_or_else(String::new, |s| s.to_string_lossy().into_owned());
+                        fixture.with_file_name(format!("{stem}.mismatch.zrif"))
+                    };
+                    match fs::read_to_string(&path) {
+                        Ok(text) => Some(text.trim().to_owned()),
+                        Err(_) => continue, // el fixture no tiene zRIF (p. ej. PATCH)
+                    }
                 }
-            } else {
-                None
+                ZrifSource::Bin => {
+                    let path = fixture.with_extension("bin");
+                    if !path.is_file() {
+                        continue;
+                    }
+                    Some(path.to_string_lossy().into_owned())
+                }
             };
 
             let legacy_out = run_bin(

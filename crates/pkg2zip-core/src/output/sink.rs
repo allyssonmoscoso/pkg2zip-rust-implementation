@@ -220,6 +220,7 @@ mod tests {
 
     #[test]
     fn fs_sink_writes_files() {
+        let _guard = crate::plat::file::CWD_LOCK.lock().expect("cwd lock");
         let dir = tempfile::tempdir().expect("tempdir");
         let cwd = std::env::current_dir().expect("cwd");
         std::env::set_current_dir(dir.path()).expect("chdir");
