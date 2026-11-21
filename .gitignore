@@ -16,3 +16,7 @@ Cargo.lock.bak
 /testdata/
 /corpus/
 *.pkg
+
+# Artefactos de salida de pruebas
+*.cso
+/cso-test-*

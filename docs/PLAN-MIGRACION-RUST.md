@@ -5,7 +5,7 @@
 | Documento | Plan de migración completa a Rust |
 | Rama de trabajo | `develop` (creada desde `master` en `6ee3df5`) |
 | Versión objetivo | `pkg2zip 3.0.0` (reescritura; reemplaza a 2.6) |
-| Estado | **F2 completada** (Vita completo: ZIP, CLI y layouts). Siguiente: F3 (PSP/PSX/PS3) |
+| Estado | **F3 completada** (PSP/PSX/PS3 portados; paridad 29/29). Siguiente: F4 (PSM y bordes) |
 | Fecha | 2026-11-20 |
 | Alcance | Reemplazar el 100 % del C por Rust, sin dependencia de compilador de C, con binarios para Windows/Linux/macOS y paridad funcional con 2.6 |
 
@@ -619,16 +619,21 @@ idéntico salvo el banner de versión.
 
 ### F3 — PSP, PSX y PS3 (6 días)
 
-- [ ] `psp/eboot.rs`: PBP, PSAR `NPUMDIMG`, tabla (xor), `init_psp_decrypt`, ISO.
-- [ ] `psp/lzrc.rs` + tests (texto plano, matches con encoder mínimo, vectores reales).
-- [ ] CSO: cabecera 24 bytes, índice `u32` con bit `0x80000000`, compresión por sector con
-      `miniz_oxide`, CRC combinado (ADR-03), `-c0..9`.
-- [ ] `psp/edat.rs`, `psp/keys.rs`, `psp/theme.rs`.
-- [ ] PSX (EBOOT, KEYS.BIN, DOCUMENT.DAT, texture.enc, licencia `.rif`) y PS3 (`pspemu/PSP/GAME`).
-- [ ] `-p`, `-d`.
+- [x] `psp`: PBP, PSAR `NPUMDIMG`, tabla (xor), `init_psp_decrypt`, ISO/CSO y LZRC.
+- [x] CSO: cabecera de 24 bytes, índice con bit `0x80000000`, compresión por sector con
+      `miniz_oxide`, CRC combinado (ADR-03) y `-c0..9`.
+- [x] EDAT, PSP-KEY.EDAT/KEYS.BIN y título de tema PSP (PTF), portados de `pkg2zip_psp.c`.
+- [x] PSX (DOCUMENT.DAT, texture.enc, licencia `.rif`) y PS3 (`pspemu/PSP/GAME/<game>`).
+- [x] `-p` y `-d`.
+- [x] Vectores golden de `init_psp_decrypt`, `init_psx_keys` y `psp_decrypt` generados con el C.
+- [x] Tests: CSO round-trip (cabecera + índice + deflate), LZRC en texto plano y fixtures de
+      PSP (`-p`), PSX (con licencia zRIF) y PS3 con paridad end-to-end.
 
-**Compuerta F3:** ISO byte a byte idéntico; CSO válido y contenido idéntico; EDAT/KEYS.BIN
-idénticos; paridad completa en PSP/PSX/PS3.
+**Compuerta F3:** paridad 29/29 en los casos válidos del corpus. ISO/CSO y EDAT/KEYS.BIN **no**
+tienen fixture end-to-end porque un PSAR/PGD sintético exige invertir el MAC del contenedor (ver
+`docs/paridad.md`); quedan cubiertos por vectores golden del C y tests unitarios, a la espera de una
+muestra real.
+
 
 ### F4 — PSM, bordes y barrido de paridad (3 días)
 
@@ -931,3 +936,4 @@ act -j test -P ubuntu-latest=catthehacker/ubuntu:act-latest
 | 2026-11-20 | F0 ejecutada: C congelado en `legacy/`, workspace Rust, testkit + arnés de paridad, CI `ci.yml`, ADR-001..010 |
 | 2026-11-20 | F1 ejecutada: AES/CTR/CMAC/PSP-AES, CRC/Adler, port de `puff` + zRIF y parsers PKG/SFO |
 | 2026-11-20 | F2 ejecutada: ZIP/ZIP64, CLI compatible, layouts APP/PATCH/DLC/THEME, work.bin, extras y PDB; paridad 15/15 |
+| 2026-11-20 | F3 ejecutada: PSP/PSX/PS3, ISO/CSO, LZRC, EDAT/KEYS.BIN, tema PSP; paridad 29/29 |

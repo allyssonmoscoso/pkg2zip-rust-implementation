@@ -14,6 +14,7 @@ pub mod error;
 pub mod output;
 pub mod pkg;
 pub mod plat;
+pub mod psp;
 pub mod vita;
 pub mod zrif;
 

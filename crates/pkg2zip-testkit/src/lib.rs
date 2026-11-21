@@ -2,6 +2,7 @@
 //!
 //! No se publica ni forma parte del binario de producción.
 
+pub mod legacy;
 pub mod parity;
 pub mod pkg;
 pub mod sfo;
