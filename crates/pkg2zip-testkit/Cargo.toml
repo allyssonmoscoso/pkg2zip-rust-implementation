@@ -1,0 +1,27 @@
+[package]
+name = "pkg2zip-testkit"
+description = "Generador de PKG sintéticos y arnés de paridad C vs Rust (solo desarrollo)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "pkg2zip-testkit"
+path = "src/main.rs"
+
+[dependencies]
+pkg2zip-core.workspace = true
+flate2.workspace = true
+miniz_oxide.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+walkdir.workspace = true
+
+[lints]
+workspace = true

@@ -7,3 +7,19 @@ pkg2zip.exe
 *.zip
 .direnv
 result
+
+# Rust
+/target/
+Cargo.lock.bak
+
+# Corpus y fixtures de prueba (se generan, no se versionan)
+/testdata/
+/corpus/
+*.pkg
+
+# Artefactos de build/release
+/dist/
+
+# Artefactos de salida de pruebas
+*.cso
+/cso-test-*

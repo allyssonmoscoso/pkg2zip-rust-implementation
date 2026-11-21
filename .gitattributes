@@ -1,0 +1,8 @@
+# Normalización de finales de línea para un repo multiplataforma.
+* text=auto
+
+# Los scripts de shell se ejecutan en Linux/macOS: siempre LF.
+*.sh text eol=lf
+
+# PowerShell es más feliz con CRLF en Windows.
+*.ps1 text eol=crlf
