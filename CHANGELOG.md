@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here.
 
+## [3.0.1] - 2026-11-20
+
+### Fixed
+
+* zRIF decoding failed with `zRIF is corrupted, wrong checksum` for real NoPayStation licenses
+  whose zlib stream has padding after the Adler-32. The checksum is now read from the position the
+  inflater consumed instead of the last 4 bytes. Validated against 3.703 real zRIFs from the NPS
+  Vita database and end-to-end (`work.bin`) against the C binary.
+
 ## [3.0.0] - 2026-11-20
 
 Complete rewrite in Rust. The C implementation lives on in the tag `v2.6-c-final`.
