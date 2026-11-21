@@ -49,7 +49,11 @@ impl std::error::Error for PuffError {}
 /// # Errores
 ///
 /// Devuelve [`PuffError`] si el flujo está truncado, es inválido o no cabe en `capacity`.
-pub fn inflate_with_dict(dict: &[u8], input: &[u8], capacity: usize) -> Result<Vec<u8>, PuffError> {
+pub fn inflate_with_dict(
+    dict: &[u8],
+    input: &[u8],
+    capacity: usize,
+) -> Result<Inflated, PuffError> {
     if dict.len() > capacity {
         return Err(PuffError::OutputFull);
     }
@@ -78,7 +82,23 @@ pub fn inflate_with_dict(dict: &[u8], input: &[u8], capacity: usize) -> Result<V
     }
 
     let dict_len = dict.len();
-    Ok(state.out.split_off(dict_len))
+    let data = state.out.split_off(dict_len);
+    Ok(Inflated {
+        data,
+        consumed: state.pos,
+    })
+}
+
+/// Resultado de un inflate: bytes nuevos y bytes de entrada consumidos.
+///
+/// `consumed` es la posición (relativa al inicio de `input`) donde empieza el Adler-32; los zRIF
+/// reales pueden llevar padding después del checksum, así que no siempre son los últimos 4 bytes.
+#[derive(Debug, Clone)]
+pub struct Inflated {
+    /// Bytes descomprimidos (sin el diccionario).
+    pub data: Vec<u8>,
+    /// Bytes de entrada consumidos por el flujo deflate.
+    pub consumed: usize,
 }
 
 struct Inflate<'a> {
@@ -409,7 +429,9 @@ mod tests {
 
         for level in [0u8, 1, 6, 10] {
             let compressed = miniz(&data, level);
-            let out = inflate_with_dict(&[], &compressed, data.len()).expect("inflate");
+            let out = inflate_with_dict(&[], &compressed, data.len())
+                .expect("inflate")
+                .data;
             assert_eq!(out, data, "nivel {level}");
         }
     }
@@ -488,7 +510,9 @@ mod tests {
         let stream = w.finish();
 
         let dict = vec![0xAAu8; 1024];
-        let out = inflate_with_dict(&dict, &stream, dict.len() + 4).expect("inflate");
+        let out = inflate_with_dict(&dict, &stream, dict.len() + 4)
+            .expect("inflate")
+            .data;
         assert_eq!(out, vec![0xAA, 0xAA, 0xAA, b'A']);
     }
 
@@ -514,7 +538,9 @@ mod tests {
         // Nivel 0 de miniz produce bloques stored.
         let data = b"bloque stored sin compresion".repeat(10);
         let compressed = miniz(&data, 0);
-        let out = inflate_with_dict(&[], &compressed, data.len()).expect("inflate");
+        let out = inflate_with_dict(&[], &compressed, data.len())
+            .expect("inflate")
+            .data;
         assert_eq!(out, data);
     }
 }

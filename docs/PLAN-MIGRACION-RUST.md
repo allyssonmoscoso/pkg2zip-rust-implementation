@@ -943,3 +943,4 @@ act -j test -P ubuntu-latest=catthehacker/ubuntu:act-latest
 | 2026-11-20 | F3 ejecutada: PSP/PSX/PS3, ISO/CSO, LZRC, EDAT/KEYS.BIN, tema PSP; paridad 29/29 |
 | 2026-11-20 | F4 ejecutada: PSM/Android, casos límite, zRIF `.bin`/mismatch y matriz de 92 casos |
 | 2026-11-20 | F5 ejecutada: release multiplataforma, documentación final, retirada del C y tag `v3.0.0` |
+| 2026-11-20 | 3.0.1: corrige el Adler-32 de zRIF con padding (reportado desde NNPPSS); validado con 3.703 zRIF reales |
