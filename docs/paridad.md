@@ -86,6 +86,27 @@ al final de cada fase).
 Esto demuestra que el fixture es válido para el parser C y que el arnés distingue correctamente
 "pendiente" de "fallo".
 
+## Baseline F1 (2026-11-20)
+
+La fase F1 añade la cripto, checksums, zRIF y parsers de formato, con 69 tests en total:
+
+| Área | Prueba |
+|---|---|
+| AES-128 ECB | FIPS-197 Apéndice C (cifrar y descifrar) |
+| AES-128 CTR | NIST SP 800-38A F.5.1 + coherencia de offsets |
+| CMAC | RFC 4493 (4 vectores) |
+| PSP-AES | 2 vectores golden generados con `legacy/pkg2zip_aes.c` compilado con MSVC |
+| CRC-32 | `"123456789"`, incremental y `combine(a, b, len_b)` contra concatenación |
+| Adler-32 | `"Wikipedia"` e incremental |
+| puff (port) | Streams deflate de `miniz_oxide` (niveles 0/1/6/10), bloques stored, capacidad insuficiente, entrada truncada |
+| puff + diccionario | Bloque fijo hecho a mano que copia 3 bytes del diccionario preestablecido y rechaza distancias fuera de rango |
+| zRIF | Cabecera zlib (FCHECK/FDICT/DICTID), checksum, método, diccionario desconocido y round-trip base64 |
+| Formato | Cabecera PKG, bloques de metadatos, SFO (incluida sanitización de título), `Kind` y región |
+| Integración | El fixture `vita_app` se parsea de punta a punta y los items descifrados coinciden con el generador |
+
+**Limitación conocida:** no hay zRIF reales en el repositorio. Los vectores de zRIF son sintéticos
+(generados con `miniz_oxide` y cabecera con diccionario). Cuando haya muestras reales se añadirán a
+`testdata/zrif/` (gitignored) y un test las consumirá si existen.
 ## Congelación de `upstream`
 
 - Repositorio original: <https://github.com/lusid1/pkg2zip>

@@ -39,6 +39,38 @@ pub enum Error {
     #[error("unsupported key type {0}")]
     UnsupportedKeyType(u8),
 
+    /// zRIF de longitud insuficiente.
+    #[error("zRIF length too short")]
+    ZrifTooShort,
+
+    /// Cabecera zlib del zRIF inválida.
+    #[error("zRIF header is corrupted")]
+    ZrifHeader,
+
+    /// El zRIF no usa deflate.
+    #[error("only deflate method supported in zRIF")]
+    ZrifMethod,
+
+    /// El zRIF declara un diccionario desconocido.
+    #[error("zRIF uses unknown dictionary")]
+    ZrifDictionary,
+
+    /// Falló la descompresión del zRIF.
+    #[error("failed to uncompress zRIF")]
+    ZrifInflate,
+
+    /// El Adler-32 del zRIF no coincide.
+    #[error("zRIF is corrupted, wrong checksum")]
+    ZrifChecksum,
+
+    /// El tamaño decodificado no es el esperado.
+    #[error("wrong size of zRIF, is it corrupted?")]
+    ZrifSize,
+
+    /// Base64 inválido en el zRIF.
+    #[error("invalid base64 in zRIF")]
+    ZrifBase64,
+
     /// Funcionalidad aún no migrada (F0).
     #[error("not implemented yet: {0}")]
     NotImplemented(&'static str),

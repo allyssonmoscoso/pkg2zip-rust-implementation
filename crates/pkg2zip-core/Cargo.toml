@@ -13,6 +13,12 @@ aes.workspace = true
 cipher.workspace = true
 ctr.workspace = true
 thiserror.workspace = true
+crc32fast.workspace = true
+cmac.workspace = true
+
+[dev-dependencies]
+miniz_oxide.workspace = true
+tempfile.workspace = true
 
 [lints]
 workspace = true

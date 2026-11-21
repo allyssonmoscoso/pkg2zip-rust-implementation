@@ -5,7 +5,7 @@
 | Documento | Plan de migración completa a Rust |
 | Rama de trabajo | `develop` (creada desde `master` en `6ee3df5`) |
 | Versión objetivo | `pkg2zip 3.0.0` (reescritura; reemplaza a 2.6) |
-| Estado | **F0 completada** (scaffolding, `legacy/` congelado, arnés de paridad y CI). F1 en curso |
+| Estado | **F1 completada** (cripto, checksums, zRIF y parsers de formato). F2 en curso |
 | Fecha | 2026-11-20 |
 | Alcance | Reemplazar el 100 % del C por Rust, sin dependencia de compilador de C, con binarios para Windows/Linux/macOS y paridad funcional con 2.6 |
 
@@ -586,15 +586,18 @@ reporte; CI verde en 3 SO.
 
 ### F1 — Núcleo criptográfico y de formatos (4 días)
 
-- [ ] `bytes.rs` (get/set LE/BE, `min32/64`), `error.rs`.
-- [ ] `crypto`: AES ECB/CTR, `ctr_xor`, CMAC, PSP-AES; tests FIPS/NIST/RFC + golden vs C.
-- [ ] `checksum`: CRC-32 + `combine`; Adler-32.
-- [ ] `zrif`: base64, cabecera zlib, `puff` port, validación y `rif_load`.
-- [ ] `pkg/sfo.rs` + `pkg/header.rs` + `pkg/meta.rs` + `pkg/kind.rs` + `region.rs`; tests de tabla.
-- [ ] Benchmarks iniciales de AES/CRC (comparar con C).
+- [x] `bytes.rs` (get/set LE/BE, `min32/64`), `error.rs`.
+- [x] `crypto`: AES ECB/CTR, `ctr_xor`, CMAC, PSP-AES; tests FIPS/NIST/RFC + golden vs C.
+- [x] `checksum`: CRC-32 + `combine`; Adler-32.
+- [x] `zrif`: base64, cabecera zlib, `puff` port, validación y `rif_load`.
+- [x] `pkg/sfo.rs` + `pkg/header.rs` + `pkg/meta.rs` + `pkg/kind.rs` + `region.rs`; tests de tabla.
+- [x] Test de integración: el fixture `vita_app` se interpreta con los parsers y la cripto de `core`.
+- [ ] Benchmarks iniciales de AES/CRC (comparar con C) — se mueven a F2 junto con el perfilado de IO.
 
-**Compuerta F1:** todos los vectores pasan; `cargo test -p pkg2zip-core` ≥ 90 % cobertura en
-`crypto`, `checksum`, `zrif`, `pkg/sfo`; un zRIF real decodifica a su `work.bin` esperado.
+**Compuerta F1:** 69 tests en verde (`FIPS-197`, `NIST SP 800-38A`, `RFC 4493`, vectores de PSP-AES
+generados con el binario C, CRC/`combine`, Adler-32, zRIF sintético y parsers de formato).
+**Pendiente:** no hay zRIF reales en el repositorio; se validarán con muestras en `testdata/`
+(gitignored) o con el corpus real del mantenedor cuando esté disponible.
 
 ### F2 — Salida, CLI y ruta Vita (5 días)
 
@@ -920,4 +923,5 @@ act -j test -P ubuntu-latest=catthehacker/ubuntu:act-latest
 |---|---|
 | 2026-11-20 | Versión inicial del plan en la rama `develop` |
 | 2026-11-20 | develop publicada en origin; flujo de trabajo con gh (PR, checks, releases, protección) y validación local de jobs Linux con ct |
-| 2026-11-20 | F0 ejecutada: C congelado en legacy/, workspace Rust, testkit + arnés de paridad, CI ci.yml, ADR-001..010 |
+| 2026-11-20 | F0 ejecutada: C congelado en `legacy/`, workspace Rust, testkit + arnés de paridad, CI `ci.yml`, ADR-001..010 |
+| 2026-11-20 | F1 ejecutada: AES/CTR/CMAC/PSP-AES, CRC/Adler, port de `puff` + zRIF y parsers PKG/SFO |

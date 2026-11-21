@@ -50,6 +50,8 @@ pub struct SyntheticPkg {
     pub title: String,
     /// `CONTENT_ID` declarado en el SFO.
     pub content_id: String,
+    /// Archivos incluidos en el fixture: `(nombre, contenido en claro)`.
+    pub files: Vec<(String, Vec<u8>)>,
 }
 
 impl SyntheticPkg {
@@ -266,10 +268,17 @@ pub fn build_vita_app(title: &str, content_id: &str) -> SyntheticPkg {
         enc[offset..offset + buf.len()].copy_from_slice(&buf);
     }
 
+    let files = items
+        .iter()
+        .filter(|item| item.flags == FLAG_FILE)
+        .map(|item| (item.name.to_owned(), item.data.clone()))
+        .collect();
+
     SyntheticPkg {
         bytes: out,
         title: title.to_owned(),
         content_id: content_id.to_owned(),
+        files,
     }
 }
 
