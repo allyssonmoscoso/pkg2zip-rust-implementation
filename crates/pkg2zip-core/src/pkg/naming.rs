@@ -37,30 +37,33 @@ pub fn root_name(naming: &Naming<'_>) -> String {
     let region = naming.region;
 
     match naming.kind {
-        Kind::Psp => {
-            let type_str = if naming.content_type == 7 {
-                if naming.category == "HG" {
-                    "PSP-PCEngine"
-                } else if naming.install_directory.is_some_and(|dir| !dir.is_empty()) {
-                    "PSP-DLC"
-                } else {
-                    "PSP"
-                }
-            } else {
-                match naming.content_type {
-                    0x0e => "PSP-Go",
-                    0x0f => "PSP-Mini",
-                    _ => "PSP-NeoGeo",
-                }
-            };
-            format!("{title} [{id}] [{type_str}]")
-        }
+        Kind::Psp => format!("{title} [{id}] [{}]", psp_type_label(naming)),
         Kind::PspTheme => format!("{title} [{id}] [PSP-Theme]"),
         Kind::Psx | Kind::Ps3 => format!("{title} [{id}] [{region}] [PSX]"),
         Kind::VitaDlc => format!("{title} [{id}] [{region}] [DLC-{}]", naming.dlc_id),
         Kind::VitaPatch => format!("{title} [{id}] [{region}] [PATCH] [v{}]", naming.app_ver),
         Kind::VitaPsm => format!("{id} [{region}] [PSM]"),
         Kind::VitaApp | Kind::VitaTheme => format!("{title} [{id}] [{region}]"),
+    }
+}
+
+/// Etiqueta de tipo para PSP (`PSP`, `PSP-DLC`, `PSP-Go`, ...), igual que el C.
+#[must_use]
+pub fn psp_type_label(naming: &Naming<'_>) -> &'static str {
+    if naming.content_type == 7 {
+        if naming.category == "HG" {
+            "PSP-PCEngine"
+        } else if naming.install_directory.is_some_and(|dir| !dir.is_empty()) {
+            "PSP-DLC"
+        } else {
+            "PSP"
+        }
+    } else {
+        match naming.content_type {
+            0x0e => "PSP-Go",
+            0x0f => "PSP-Mini",
+            _ => "PSP-NeoGeo",
+        }
     }
 }
 

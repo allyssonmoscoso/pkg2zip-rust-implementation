@@ -34,6 +34,10 @@ pub struct PkgHeader {
     pub iv: [u8; 16],
     /// `key_type` (1 PSP/PS3, 2 Vita2, 3 Vita3, 4 Vita4/PS3).
     pub key_type: u8,
+    /// Serial de 9 caracteres de la cabecera (`0x37..0x40`), usado por PSP/PSX/PS3.
+    pub serial: [u8; 9],
+    /// Título de tema PSP en la cabecera (`0x44..0x54`).
+    pub theme_title: [u8; 16],
 }
 
 impl PkgHeader {
@@ -53,6 +57,10 @@ impl PkgHeader {
 
         let mut iv = [0u8; 16];
         iv.copy_from_slice(&bytes[0x70..0x80]);
+        let mut serial = [0u8; 9];
+        serial.copy_from_slice(&bytes[0x37..0x40]);
+        let mut theme_title = [0u8; 16];
+        theme_title.copy_from_slice(&bytes[0x44..0x54]);
 
         Ok(Self {
             hdr_type: get16be(&bytes[6..]),
@@ -64,6 +72,8 @@ impl PkgHeader {
             enc_size: get64be(&bytes[40..]),
             iv,
             key_type: bytes[0xe7] & 7,
+            serial,
+            theme_title,
         })
     }
 

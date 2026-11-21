@@ -236,6 +236,10 @@ fn write_all_at(file: &File, mut data: &[u8], mut offset: u64) -> io::Result<()>
 pub trait Ui {
     /// Mensaje informativo (`[*] ...`).
     fn info(&mut self, message: &str);
+    /// Mensaje informativo sin salto de línea (el C lo usa al crear el `.rif` de PSX).
+    fn info_raw(&mut self, message: &str) {
+        self.info(message);
+    }
     /// Progreso absoluto en bytes (se ignora si no hay TTY).
     fn progress(&mut self, position: u64);
     /// Inicializa el total para calcular el porcentaje.

@@ -388,6 +388,9 @@ pub fn build_corpus() -> Vec<(String, SyntheticPkg)> {
             "vita_theme.pkg".to_owned(),
             build_vita_theme("Synthetic Vita Theme", DEFAULT_CONTENT_ID),
         ),
+        ("psp_pbp.pkg".to_owned(), crate::legacy::build_psp()),
+        ("psx_docs.pkg".to_owned(), crate::legacy::build_psx()),
+        ("ps3_doc.pkg".to_owned(), crate::legacy::build_ps3()),
     ]
 }
 

@@ -14,9 +14,12 @@ use pkg2zip_core::crypto::derive_keys;
 use pkg2zip_core::error::{Error, Result};
 use pkg2zip_core::output::Sink;
 use pkg2zip_core::pkg::meta::META_INSTALL_DIRECTORY;
-use pkg2zip_core::pkg::{HEADER_TOTAL, Kind, MetaBlock, MetaInfo, PkgHeader, sfo};
+use pkg2zip_core::pkg::naming::{self, Naming};
+use pkg2zip_core::pkg::{HEADER_TOTAL, Kind, MetaBlock, MetaInfo, PkgHeader, region, sfo};
 use pkg2zip_core::plat::{DataFile, Ui};
+use pkg2zip_core::psp::{self, PspContext, PspOptions};
 use pkg2zip_core::vita::{self, VitaContext};
+use pkg2zip_core::zrif::{rif_load, zrif_decode};
 
 use args::{Config, Parsed};
 use ui::ConsoleUi;
@@ -103,12 +106,12 @@ fn run(config: &Config) -> Result<Outcome> {
     let base_kind = Kind::from_content_type(content_type)?;
 
     match base_kind {
-        Kind::VitaApp | Kind::VitaDlc | Kind::VitaPsm | Kind::VitaTheme => {
+        Kind::VitaApp | Kind::VitaDlc | Kind::VitaPsm | Kind::VitaTheme | Kind::VitaPatch => {
             unpack_vita(config, &pkg, &header, &info, base_kind, &mut ui)
         }
-        _ => Ok(Outcome::Pending(
-            "PSP/PSX/PS3 unpacking arrives in phase F3",
-        )),
+        Kind::Psp | Kind::PspTheme | Kind::Psx | Kind::Ps3 => {
+            unpack_psp_family(config, &pkg, &header, &info, base_kind, &mut ui)
+        }
     }
 }
 
@@ -212,6 +215,152 @@ fn unpack_vita(
     }
 
     Ok(Outcome::Done)
+}
+
+fn unpack_psp_family(
+    config: &Config,
+    pkg: &DataFile,
+    header: &PkgHeader,
+    info: &MetaInfo,
+    kind: Kind,
+    ui: &mut ConsoleUi,
+) -> Result<Outcome> {
+    let keys = derive_keys(header.key_type, header.hdr_type, &header.iv)?;
+    let mut category = String::new();
+    let title;
+    let id;
+    let mut rif = None;
+
+    match kind {
+        Kind::Psp | Kind::Psx => {
+            let parsed = psp::find_psp_sfo(pkg, header, info, &keys)?;
+            category = parsed.category().to_owned();
+            title = parsed.title().to_owned();
+            let disc_id = psp::find_pbp_disc_id(pkg, header, info, &keys)?;
+            id = if disc_id.is_empty() {
+                header_serial(header)
+            } else {
+                disc_id
+            };
+            if kind == Kind::Psx
+                && let Some(zrif) = config.zrif.as_deref()
+            {
+                rif = Some(if zrif.ends_with(".bin") {
+                    rif_load(Path::new(zrif), 512)?
+                } else {
+                    zrif_decode(zrif, 512)?
+                });
+            }
+        }
+        Kind::PspTheme => {
+            id = header_serial(header);
+            title = String::new();
+        }
+        Kind::Ps3 => {
+            id = header_serial(header);
+            title = id.clone();
+        }
+        _ => {
+            return Err(Error::Corrupt("unsupported kind for PSP unpacking"));
+        }
+    }
+
+    let mut context = PspContext {
+        pkg,
+        header,
+        info,
+        keys,
+        kind,
+        title,
+        id,
+        category,
+        rif,
+    };
+
+    if kind == Kind::PspTheme {
+        let (offset, size) = psp::first_item_data(pkg, header, info, &context.keys)?;
+        context.title = psp::get_psp_theme_title(&context, offset, size)?;
+    }
+
+    let id9: String = context.id.chars().take(9).collect();
+    let naming = Naming {
+        kind,
+        title: &context.title,
+        id: &id9,
+        region: region(&id9),
+        app_ver: "",
+        content_type: info.content_type.unwrap_or(0),
+        install_directory: info.install_directory.as_deref(),
+        dlc_id: "",
+        category: &context.category,
+    };
+    let root = naming::root_name(&naming);
+
+    if config.verbose {
+        ui.info(&unpacking_message_psp(kind, &naming));
+    }
+
+    if config.listing {
+        if !config.zipped {
+            return Err(Error::Corrupt(
+                "Listing option without creating zip is useless",
+            ));
+        }
+        println!("{root}.zip");
+        return Ok(Outcome::Done);
+    }
+
+    let name = if config.zipped {
+        format!("{root}.zip")
+    } else {
+        root.clone()
+    };
+    if config.verbose {
+        if config.zipped {
+            ui.info(&format!("[*] creating '{name}' archive"));
+        } else {
+            ui.info(&format!("[*] unpacking '{name}' to directory"));
+        }
+    }
+
+    let mut sink = Sink::create(&name, config.zipped)?;
+    psp::unpack(
+        &context,
+        PspOptions {
+            pbp: config.pbp,
+            ddlc: config.ddlc,
+            cso: config.cso,
+            zipped: config.zipped,
+        },
+        &mut sink,
+        ui,
+    )?;
+    sink.finish()?;
+
+    if config.verbose {
+        ui.info("[*] done!");
+    }
+
+    Ok(Outcome::Done)
+}
+
+fn header_serial(header: &PkgHeader) -> String {
+    let end = header
+        .serial
+        .iter()
+        .position(|&byte| byte == 0)
+        .unwrap_or(header.serial.len());
+    String::from_utf8_lossy(&header.serial[..end]).into_owned()
+}
+
+fn unpacking_message_psp(kind: Kind, naming: &Naming<'_>) -> String {
+    match kind {
+        Kind::Psp => format!("[*] unpacking {}", naming::psp_type_label(naming)),
+        Kind::PspTheme => "[*] unpacking PSP Theme".to_owned(),
+        Kind::Psx => "[*] unpacking PSX".to_owned(),
+        Kind::Ps3 => "[*] unpacking PS3 PSX".to_owned(),
+        _ => String::new(),
+    }
 }
 
 fn unpacking_message(kind: Kind) -> &'static str {

@@ -51,7 +51,10 @@ fn gen_cmd(args: &[String]) -> Result<ExitCode, String> {
         println!("{} ({} bytes)", path.display(), pkg.bytes.len());
 
         // El PATCH no usa work.bin; el resto sí, con un zRIF generado.
-        if name != "vita_patch.pkg" {
+        if !matches!(
+            name.as_str(),
+            "vita_patch.pkg" | "psp_pbp.pkg" | "ps3_doc.pkg"
+        ) {
             let zrif_path = path.with_extension("zrif");
             std::fs::write(&zrif_path, testkit_zrif::zrif_string(&pkg.content_id))
                 .map_err(|e| format!("no se pudo escribir {}: {e}", zrif_path.display()))?;

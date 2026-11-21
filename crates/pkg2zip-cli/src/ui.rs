@@ -67,6 +67,13 @@ impl Ui for ConsoleUi {
         }
     }
 
+    fn info_raw(&mut self, message: &str) {
+        if !self.quiet {
+            print!("{message}");
+            let _ = std::io::stdout().flush();
+        }
+    }
+
     fn progress_init(&mut self, total: u64) {
         self.progress_total = total;
         self.next_percent = 0;

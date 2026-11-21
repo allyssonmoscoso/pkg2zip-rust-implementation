@@ -118,6 +118,11 @@ const CASES: &[Case] = &[
         args: &["-x"],
         with_zrif: true,
     },
+    Case {
+        name: "psp-pbp",
+        args: &["-p"],
+        with_zrif: false,
+    },
 ];
 
 #[derive(Debug)]
@@ -227,6 +232,18 @@ fn truncate(mut details: Vec<String>, max: usize) -> Vec<String> {
     details
 }
 
+/// Filtra casos según el fixture: los PKG de PSP solo validan `-p` (el PSAR sintético no es
+/// válido) y los de PS3 solo las rutas que no pasan por KEYS.BIN.
+fn case_applies(case: &Case, fixture: &str) -> bool {
+    if fixture.starts_with("psp_") {
+        matches!(case.name, "list" | "psp-pbp")
+    } else if fixture.starts_with("ps3_") {
+        matches!(case.name, "list" | "extract" | "zip")
+    } else {
+        true
+    }
+}
+
 fn is_pending(outcome: &Outcome) -> bool {
     outcome.code == Some(RUST_PENDING_EXIT_CODE)
 }
@@ -316,6 +333,9 @@ pub fn run(options: &Options) -> Result<Summary> {
         );
 
         for case in CASES {
+            if !case_applies(case, &fixture_name) {
+                continue;
+            }
             let legacy_dir = TempDir::new()?;
             let rust_dir = TempDir::new()?;
 

@@ -132,6 +132,34 @@ Notas:
 - PSM/Android sigue pendiente (F4); el arnés marcará esos casos como `pending` cuando exista el
   fixture.
 
+## Baseline F3 (2026-11-20)
+
+F3 añade PSP/PSX/PS3. El corpus crece a **7 fixtures** y la corrida a **29 casos**:
+
+| Fixture | Casos | Cubre |
+|---|---|---|
+| `vita_*` (4) | `list`, `extract`, `zip`, `zrif`, `psp-pbp` | Vita completo |
+| `psp_pbp` | `list`, `psp-pbp` | modo `-p`: EBOOT.PBP, DOCUMENT.DAT y contenido extra |
+| `psx_docs` | `list`, `extract`, `zip`, `zrif`, `psp-pbp` | PSX: DOCUMENT.DAT, texture.enc y licencia `.rif` desde zRIF |
+| `ps3_doc` | `list`, `extract`, `zip` | PS3: `pspemu/PSP/GAME/<game>/DOCUMENT.DAT` |
+
+Resultado: `29 passed, 0 pending, 0 failed`.
+
+**Cripto validada contra el binario C** (vectores golden generados con MSVC y las funciones
+originales):
+
+- `init_psp_decrypt` (IV derivado y descifrado de la cabecera PSAR).
+- `init_psx_keys` (KEYS.BIN de PSX/PS3).
+- `psp_decrypt` (dos vectores de 64 y 32 bytes).
+- `CsoEncoder`: round-trip ISO → CSO → ISO con cabecera, índice y sectores comprimidos.
+- LZRC: modo texto plano y validación de entradas truncadas.
+
+**Limitación conocida:** los caminos que dependen de un PSAR/PGD real (ISO/CSO desde EBOOT y
+EDAT/KEYS.BIN) no tienen fixture end-to-end. Construir un PSAR sintético exige resolver el punto
+fijo `C = P ^ K(CMAC(C))` que impone el MAC del contenedor; eso solo es viable con una muestra real
+o con las claves de firma. La lógica está portada y la cripto validada con vectores del C; cuando
+haya una muestra se añadirá a `testdata/psp/` (gitignored) y se activará la paridad de ISO/CSO/EDAT.
+
 ## Congelación de `upstream`
 
 - Repositorio original: <https://github.com/lusid1/pkg2zip>
@@ -143,6 +171,6 @@ Notas:
 | Fase | Se añade a la comparación |
 |---|---|
 | F2 | ZIP (entradas + CRC), stdout estricto en `-x`, fixtures APP/PATCH/DLC/THEME y zRIF |
-| F3 | PSP/PSX: ISO byte a byte, CSO (contenido + índice), EDAT, KEYS.BIN |
+| F3 | PSP `-p`, PSX (DOCUMENT.DAT/texture.enc/`.rif`) y PS3; cripto PSP validada con vectores golden |
 | F4 | Todos los tipos y flags (`-b`, `-p`, `-d`, `-a`, `-cN`), errores y stderr |
 | F5 | Matriz final como *gate* de release |
