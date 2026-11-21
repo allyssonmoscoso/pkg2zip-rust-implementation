@@ -34,6 +34,12 @@ impl Crc32 {
         self.hasher.finalize()
     }
 
+    /// CRC-32 del estado actual sin consumirlo (equivalente a `crc32_done` sin cerrar).
+    #[must_use]
+    pub fn current(&self) -> u32 {
+        self.hasher.clone().finalize()
+    }
+
     /// Reinicia el estado (equivalente a crear uno nuevo).
     pub fn reset(&mut self) {
         self.hasher.reset();

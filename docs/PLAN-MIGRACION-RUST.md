@@ -5,7 +5,7 @@
 | Documento | Plan de migración completa a Rust |
 | Rama de trabajo | `develop` (creada desde `master` en `6ee3df5`) |
 | Versión objetivo | `pkg2zip 3.0.0` (reescritura; reemplaza a 2.6) |
-| Estado | **F1 completada** (cripto, checksums, zRIF y parsers de formato). F2 en curso |
+| Estado | **F2 completada** (Vita completo: ZIP, CLI y layouts). Siguiente: F3 (PSP/PSX/PS3) |
 | Fecha | 2026-11-20 |
 | Alcance | Reemplazar el 100 % del C por Rust, sin dependencia de compilador de C, con binarios para Windows/Linux/macOS y paridad funcional con 2.6 |
 
@@ -601,16 +601,21 @@ generados con el binario C, CRC/`combine`, Adler-32, zRIF sintético y parsers d
 
 ### F2 — Salida, CLI y ruta Vita (5 días)
 
-- [ ] `output/zip.rs` (ZIP64, stored, CRC diferido, `write_at`, `set_offset`), `sink.rs`.
-- [ ] `plat/file.rs`, `plat/console.rs`, `plat/progress.rs`.
-- [ ] `cli`: parser compatible + mensajes + códigos de salida; `--version` aditivo.
-- [ ] `pkg/naming.rs` (9 tipos, región, sufijos, `-l`).
-- [ ] Flujo Vita APP/PATCH/DLC/THEME: items, carpetas, `digs.bin`/`cert.bin` → `body.bin`,
+- [x] `output/zip.rs` (ZIP64, stored/deflate, CRC diferido, `write_at`, `set_offset`), `sink.rs`.
+- [x] `plat/file.rs` (pread/pwrite); consola, progreso y UTF-8 de Windows en la CLI (`ui.rs`).
+- [x] `cli`: parser compatible + mensajes + códigos de salida; `--version` aditivo.
+- [x] `pkg/naming.rs` (9 tipos, región, sufijos, `-l`).
+- [x] Flujo Vita APP/PATCH/DLC/THEME: items, carpetas, `digs.bin`/`cert.bin` → `body.bin`,
       `work.bin`, `head/tail/stat.bin`, PDB bgdl.
-- [ ] Paridad end-to-end de los 4 tipos Vita en zip y `-x`.
+- [x] Testkit: corpus de 4 fixtures + zRIF sintéticos (bloques stored) para `work.bin`.
+- [x] Arnés: casos `list`, `extract`, `zip` y `zrif`, con comparación de entradas ZIP (nombre,
+      CRC y SHA-256) y stdout estricto.
+- [ ] PSM/Android (se completan en F4).
 
-**Compuerta F2:** `parity` sin diferencias para los fixtures Vita en `""`, `-x`, `-l`, `-q`, `-b`;
-ZIP validado por `unzip -t`; `-l` byte a byte.
+**Compuerta F2:** 15/15 casos de paridad sin diferencias (4 fixtures × `-l`, `-x`, zip, y `-x` con
+zRIF para APP/DLC/THEME); ZIP equivalente al C en entradas y contenido; `-l` byte a byte; stdout
+idéntico salvo el banner de versión.
+
 
 ### F3 — PSP, PSX y PS3 (6 días)
 
@@ -925,3 +930,4 @@ act -j test -P ubuntu-latest=catthehacker/ubuntu:act-latest
 | 2026-11-20 | develop publicada en origin; flujo de trabajo con gh (PR, checks, releases, protección) y validación local de jobs Linux con ct |
 | 2026-11-20 | F0 ejecutada: C congelado en `legacy/`, workspace Rust, testkit + arnés de paridad, CI `ci.yml`, ADR-001..010 |
 | 2026-11-20 | F1 ejecutada: AES/CTR/CMAC/PSP-AES, CRC/Adler, port de `puff` + zRIF y parsers PKG/SFO |
+| 2026-11-20 | F2 ejecutada: ZIP/ZIP64, CLI compatible, layouts APP/PATCH/DLC/THEME, work.bin, extras y PDB; paridad 15/15 |

@@ -33,7 +33,7 @@ fn parses_synthetic_vita_app_end_to_end() {
     let sfo = sfo::parse(sfo_bytes).expect("SFO");
     assert_eq!(sfo.title(), "Synthetic Vita App");
     assert_eq!(sfo.category(), "gd");
-    assert_eq!(sfo.app_ver.as_deref(), Some("1.0"));
+    assert_eq!(sfo.app_ver.as_deref(), Some("1.00"));
     assert_eq!(sfo.min_version.as_deref(), Some("3.61"));
 
     let kind = Kind::from_content_type(info.content_type.expect("content type"))

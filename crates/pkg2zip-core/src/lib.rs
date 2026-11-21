@@ -11,7 +11,10 @@ pub mod bytes;
 pub mod checksum;
 pub mod crypto;
 pub mod error;
+pub mod output;
 pub mod pkg;
+pub mod plat;
+pub mod vita;
 pub mod zrif;
 
 pub use error::{Error, Result};

@@ -5,3 +5,5 @@
 pub mod parity;
 pub mod pkg;
 pub mod sfo;
+pub mod zipfile;
+pub mod zrif;

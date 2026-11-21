@@ -71,6 +71,15 @@ pub enum Error {
     #[error("invalid base64 in zRIF")]
     ZrifBase64,
 
+    /// El `CONTENT_ID` del zRIF no coincide con el del PKG.
+    #[error("zRIF content id '{rif}' doesn't match pkg '{pkg}'")]
+    ZrifMismatch {
+        /// `CONTENT_ID` que declara el zRIF.
+        rif: String,
+        /// `CONTENT_ID` del SFO.
+        pkg: String,
+    },
+
     /// Funcionalidad aún no migrada (F0).
     #[error("not implemented yet: {0}")]
     NotImplemented(&'static str),
