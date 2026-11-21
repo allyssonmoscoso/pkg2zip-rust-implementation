@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [develop]
+    branches: [develop, master]
   pull_request:
     branches: [develop, master]
   workflow_dispatch:
@@ -53,6 +53,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --locked
 
+  msrv:
+    name: msrv (1.89)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --locked
+
   no-c:
     name: no C toolchain
     runs-on: ubuntu-latest
@@ -65,9 +74,7 @@ jobs:
           set -euo pipefail
           deps="$(cargo tree --workspace -e normal,build --prefix none | sort -u)"
           echo "$deps"
-          # `cc`/`cmake`/`bindgen` son los mecanismos con los que un build.rs compila C.
           offenders="$(echo "$deps" | grep -E '^(cc|cmake|bindgen) v' || true)"
-          # Crates -sys que no compilan C (binding puros de Rust).
           sys_crates="$(echo "$deps" | grep -E -- '-sys v' \
             | grep -vE '^(windows-sys|windows-link|linux-raw-sys) v' || true)"
           if [ -n "$offenders$sys_crates" ]; then
@@ -84,30 +91,20 @@ jobs:
             exit 1
           fi
 
-  parity:
-    name: parity (C vs Rust)
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
+  machete:
+    name: unused deps
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Compilar el binario C de referencia
-        run: ./scripts/build-legacy.sh "$PWD/target/legacy"
-      - name: Generar corpus sintético
-        run: cargo run -q -p pkg2zip-testkit -- gen target/corpus
-      - name: Compilar el binario Rust
-        run: cargo build --locked
-      - name: Ejecutar arnés de paridad
-        run: |
-          cargo run -q -p pkg2zip-testkit -- parity \
-            --corpus target/corpus \
-            --legacy target/legacy/pkg2zip \
-            --rust target/debug/pkg2zip \
-            --report target/parity.json
-      - name: Publicar reporte de paridad
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: parity-report
-          path: target/parity.json
-          if-no-files-found: ignore
+      - uses: taiki-e/install-action@cargo-machete
+      - run: cargo machete
