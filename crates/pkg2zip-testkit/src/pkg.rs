@@ -128,7 +128,7 @@ fn items() -> Vec<Item> {
     ]
 }
 
-fn build(spec: &Spec) -> SyntheticPkg {
+fn build(spec: &Spec, items: Vec<Item>) -> SyntheticPkg {
     let sfo = sfo::build(&[
         ("TITLE", &spec.title),
         ("STITLE", &spec.title),
@@ -137,7 +137,6 @@ fn build(spec: &Spec) -> SyntheticPkg {
         ("APP_VER", spec.app_ver),
         ("PSP2_DISP_VER", spec.min_version),
     ]);
-    let items = items();
     let item_count = items.len();
     let table_size = item_count * 32;
 
@@ -315,57 +314,141 @@ fn write_block(out: &mut [u8], block_type: u32, size: u32, fields: impl FnOnce(&
 /// PKG de tipo APP (`category = "gd"`).
 #[must_use]
 pub fn build_vita_app(title: &str, content_id: &str) -> SyntheticPkg {
-    build(&Spec {
-        title: title.to_owned(),
-        content_id: content_id.to_owned(),
-        content_type: CONTENT_TYPE_VITA_APP,
-        category: "gd",
-        app_ver: "01.00",
-        min_version: "03.61",
-        install_directory: None,
-    })
+    build(
+        &Spec {
+            title: title.to_owned(),
+            content_id: content_id.to_owned(),
+            content_type: CONTENT_TYPE_VITA_APP,
+            category: "gd",
+            app_ver: "01.00",
+            min_version: "03.61",
+            install_directory: None,
+        },
+        items(),
+    )
 }
 
 /// PKG de tipo PATCH (`CONTENT_TYPE` de APP con `CATEGORY = "gp"`).
 #[must_use]
 pub fn build_vita_patch(title: &str, content_id: &str) -> SyntheticPkg {
-    build(&Spec {
-        title: title.to_owned(),
-        content_id: content_id.to_owned(),
-        content_type: CONTENT_TYPE_VITA_APP,
-        category: "gp",
-        app_ver: "02.10",
-        min_version: "03.61",
-        install_directory: None,
-    })
+    build(
+        &Spec {
+            title: title.to_owned(),
+            content_id: content_id.to_owned(),
+            content_type: CONTENT_TYPE_VITA_APP,
+            category: "gp",
+            app_ver: "02.10",
+            min_version: "03.61",
+            install_directory: None,
+        },
+        items(),
+    )
 }
 
 /// PKG de tipo DLC (incluye bloque de directorio de instalación).
 #[must_use]
 pub fn build_vita_dlc(title: &str, content_id: &str) -> SyntheticPkg {
-    build(&Spec {
-        title: title.to_owned(),
-        content_id: content_id.to_owned(),
-        content_type: CONTENT_TYPE_VITA_DLC,
-        category: "gd",
-        app_ver: "01.00",
-        min_version: "03.61",
-        install_directory: Some("DLC".to_owned()),
-    })
+    build(
+        &Spec {
+            title: title.to_owned(),
+            content_id: content_id.to_owned(),
+            content_type: CONTENT_TYPE_VITA_DLC,
+            category: "gd",
+            app_ver: "01.00",
+            min_version: "03.61",
+            install_directory: Some("DLC".to_owned()),
+        },
+        items(),
+    )
 }
 
 /// PKG de tipo THEME.
 #[must_use]
 pub fn build_vita_theme(title: &str, content_id: &str) -> SyntheticPkg {
-    build(&Spec {
-        title: title.to_owned(),
-        content_id: content_id.to_owned(),
-        content_type: CONTENT_TYPE_VITA_THEME,
-        category: "gd",
-        app_ver: "01.00",
-        min_version: "03.61",
-        install_directory: None,
-    })
+    build(
+        &Spec {
+            title: title.to_owned(),
+            content_id: content_id.to_owned(),
+            content_type: CONTENT_TYPE_VITA_THEME,
+            category: "gd",
+            app_ver: "01.00",
+            min_version: "03.61",
+            install_directory: None,
+        },
+        items(),
+    )
+}
+
+fn edge_items() -> Vec<Item> {
+    let long_name = format!("{}.bin", "a".repeat(120));
+    vec![
+        Item {
+            name: "empty.bin".to_owned(),
+            data: Vec::new(),
+            flags: FLAG_FILE,
+        },
+        Item {
+            name: long_name,
+            data: pattern(0xABCD_1234, 128),
+            flags: FLAG_FILE,
+        },
+        Item {
+            name: "unicode-ñandú.bin".to_owned(),
+            data: pattern(0x1357_9BDF, 64),
+            flags: FLAG_FILE,
+        },
+    ]
+}
+
+/// APP con título "difícil" (dospuntos, salto de línea, UTF-8) y archivos vacíos/largos.
+#[must_use]
+pub fn build_vita_edge(title: &str) -> SyntheticPkg {
+    build(
+        &Spec {
+            title: title.to_owned(),
+            content_id: DEFAULT_CONTENT_ID.to_owned(),
+            content_type: CONTENT_TYPE_VITA_APP,
+            category: "gd",
+            app_ver: "01.00",
+            min_version: "03.61",
+            install_directory: None,
+        },
+        edge_items(),
+    )
+}
+
+/// PKG con firma inválida (error "not a pkg file").
+#[must_use]
+pub fn build_bad_magic() -> SyntheticPkg {
+    let mut pkg = build_vita_app("Bad Magic", DEFAULT_CONTENT_ID);
+    pkg.bytes[0] = 0;
+    pkg
+}
+
+/// PKG cuyo `total_size` declara más bytes de los que hay ("pkg file is too small").
+#[must_use]
+pub fn build_truncated_size() -> SyntheticPkg {
+    let mut pkg = build_vita_app("Truncated", DEFAULT_CONTENT_ID);
+    let declared = (pkg.bytes.len() as u64) + 0x1000;
+    set64be(&mut pkg.bytes[24..32], declared);
+    pkg
+}
+
+/// PKG con `content_type` no soportado.
+#[must_use]
+pub fn build_unsupported() -> SyntheticPkg {
+    build(
+        &Spec {
+            title: "Unsupported".to_owned(),
+            content_id: DEFAULT_CONTENT_ID.to_owned(),
+            content_type: 0x99,
+            category: "gd",
+            app_ver: "01.00",
+            min_version: "03.61",
+            install_directory: None,
+        },
+        items(),
+    )
 }
 
 /// Corpus de fixtures: nombre de archivo y PKG.
@@ -388,6 +471,14 @@ pub fn build_corpus() -> Vec<(String, SyntheticPkg)> {
             "vita_theme.pkg".to_owned(),
             build_vita_theme("Synthetic Vita Theme", DEFAULT_CONTENT_ID),
         ),
+        (
+            "vita_edge.pkg".to_owned(),
+            build_vita_edge("Edge: ñandú ☃\nv2"),
+        ),
+        ("bad_magic.pkg".to_owned(), build_bad_magic()),
+        ("truncated_size.pkg".to_owned(), build_truncated_size()),
+        ("unsupported.pkg".to_owned(), build_unsupported()),
+        ("psm.pkg".to_owned(), crate::legacy::build_psm()),
         ("psp_pbp.pkg".to_owned(), crate::legacy::build_psp()),
         ("psx_docs.pkg".to_owned(), crate::legacy::build_psx()),
         ("ps3_doc.pkg".to_owned(), crate::legacy::build_ps3()),

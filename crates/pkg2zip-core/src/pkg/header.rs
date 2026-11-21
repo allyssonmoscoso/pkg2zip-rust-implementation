@@ -38,6 +38,8 @@ pub struct PkgHeader {
     pub serial: [u8; 9],
     /// Título de tema PSP en la cabecera (`0x44..0x54`).
     pub theme_title: [u8; 16],
+    /// `CONTENT_ID` de PSM en la cabecera (`0x30..0x60`).
+    pub content_id: [u8; 0x30],
 }
 
 impl PkgHeader {
@@ -61,6 +63,8 @@ impl PkgHeader {
         serial.copy_from_slice(&bytes[0x37..0x40]);
         let mut theme_title = [0u8; 16];
         theme_title.copy_from_slice(&bytes[0x44..0x54]);
+        let mut content_id = [0u8; 0x30];
+        content_id.copy_from_slice(&bytes[0x30..0x60]);
 
         Ok(Self {
             hdr_type: get16be(&bytes[6..]),
@@ -74,6 +78,7 @@ impl PkgHeader {
             key_type: bytes[0xe7] & 7,
             serial,
             theme_title,
+            content_id,
         })
     }
 
@@ -84,11 +89,11 @@ impl PkgHeader {
     /// [`Error::TooShort`] si el PKG es más pequeño que `total_size` o que la tabla de items.
     pub fn validate(&self, pkg_size: u64) -> Result<()> {
         if pkg_size < self.total_size {
-            return Err(Error::TooShort("pkg file"));
+            return Err(Error::Corrupt("pkg file is too small"));
         }
         let items_end = self.enc_offset + u64::from(self.item_count) * 32;
         if pkg_size < items_end {
-            return Err(Error::TooShort("pkg file"));
+            return Err(Error::Corrupt("pkg file is too small"));
         }
         Ok(())
     }
@@ -142,7 +147,7 @@ mod tests {
     fn validate_checks_declared_sizes() {
         let header = PkgHeader::parse(&header_bytes()).expect("cabecera");
         header.validate(0x2000).expect("tamaño exacto");
-        assert!(matches!(header.validate(0x1fff), Err(Error::TooShort(_))));
-        assert!(matches!(header.validate(0x4ff), Err(Error::TooShort(_))));
+        assert!(matches!(header.validate(0x1fff), Err(Error::Corrupt(_))));
+        assert!(matches!(header.validate(0x4ff), Err(Error::Corrupt(_))));
     }
 }

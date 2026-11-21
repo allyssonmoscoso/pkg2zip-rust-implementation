@@ -7,26 +7,40 @@
 use pkg2zip_core::checksum::adler32;
 use pkg2zip_core::zrif::ZRIF_DICT_ID;
 
-/// Tamaño del RIF de Vita (PSM usa 1024; F2 solo Vita normal).
+/// Tamaño del RIF de Vita.
 pub const RIF_SIZE: usize = 512;
+/// Offset del `CONTENT_ID` en un RIF de Vita.
+pub const RIF_CONTENT_OFFSET: usize = 0x10;
 
-/// Construye un RIF de 512 bytes con el `CONTENT_ID` en el offset 0x10.
+/// Construye un RIF con el `CONTENT_ID` en el offset indicado.
 #[must_use]
-pub fn rif(content_id: &str) -> Vec<u8> {
-    let mut rif = vec![0u8; RIF_SIZE];
+pub fn rif_at(content_id: &str, size: usize, offset: usize) -> Vec<u8> {
+    let mut rif = vec![0u8; size];
     let bytes = content_id.as_bytes();
     let len = bytes.len().min(0x30);
-    rif[0x10..0x10 + len].copy_from_slice(&bytes[..len]);
+    rif[offset..offset + len].copy_from_slice(&bytes[..len]);
     rif
 }
 
-/// Construye un zRIF (base64) para el `CONTENT_ID` indicado.
+/// RIF de Vita (512 bytes, `CONTENT_ID` en 0x10).
 #[must_use]
-pub fn zrif_string(content_id: &str) -> String {
-    base64(&zlib_stored(&rif(content_id)))
+pub fn rif(content_id: &str) -> Vec<u8> {
+    rif_at(content_id, RIF_SIZE, RIF_CONTENT_OFFSET)
 }
 
-fn zlib_stored(payload: &[u8]) -> Vec<u8> {
+/// zRIF de Vita.
+#[must_use]
+pub fn zrif_string(content_id: &str) -> String {
+    zrif_string_at(content_id, RIF_SIZE, RIF_CONTENT_OFFSET)
+}
+
+/// zRIF para un RIF de `size` bytes con el `CONTENT_ID` en `offset` (PSM usa 1024 / 0x50).
+#[must_use]
+pub fn zrif_string_at(content_id: &str, size: usize, offset: usize) -> String {
+    base64(&zlib_compressed(&rif_at(content_id, size, offset)))
+}
+
+fn zlib_compressed(payload: &[u8]) -> Vec<u8> {
     let mut out = Vec::new();
     let cmf: u8 = 0x28; // CINFO = 2 (ventana 1024), CM = 8 (deflate)
     let base_flg: u8 = 0xE0; // FLEVEL = 3, FDICT = 1
@@ -35,17 +49,11 @@ fn zlib_stored(payload: &[u8]) -> Vec<u8> {
     out.push(cmf);
     out.push(base_flg | u8::try_from(check).expect("check < 31"));
     out.extend_from_slice(&ZRIF_DICT_ID.to_be_bytes());
-
-    // Bloque stored: BFINAL=1, BTYPE=00, padding a byte.
-    out.push(0x01);
-    let len = u16::try_from(payload.len()).expect("payload cabe en u16");
-    out.extend_from_slice(&len.to_le_bytes());
-    out.extend_from_slice(&(!len).to_le_bytes());
-    out.extend_from_slice(payload);
+    // Deflate real: el buffer `raw[1024]` del C no admite un bloque stored de 1024+ bytes.
+    out.extend_from_slice(&miniz_oxide::deflate::compress_to_vec(payload, 9));
     out.extend_from_slice(&adler32(payload).to_be_bytes());
     out
 }
-
 /// Base64 estándar sin padding (como los zRIF habituales).
 #[must_use]
 pub fn base64(input: &[u8]) -> String {
@@ -73,20 +81,19 @@ mod tests {
     use super::*;
     use pkg2zip_core::zrif::zrif_decode;
 
+    const CONTENT_ID: &str = "UP0000-PCSE00000_00-0000000000000000";
+
     #[test]
     fn generated_zrif_decodes_to_the_rif() {
-        let content_id = "UP0000-PCSE00000_00-0000000000000000";
-        let encoded = zrif_string(content_id);
-        let decoded = zrif_decode(&encoded, RIF_SIZE).expect("zRIF válido");
-        assert_eq!(decoded, rif(content_id));
+        let decoded = zrif_decode(&zrif_string(CONTENT_ID), RIF_SIZE).expect("zRIF válido");
+        assert_eq!(decoded, rif(CONTENT_ID));
     }
 
     #[test]
-    fn rif_contains_content_id_at_0x10() {
-        let rif = rif(DEFAULT);
-        assert_eq!(&rif[0x10..0x10 + 7], b"UP0000-");
-        assert_eq!(&rif[0x17..0x20], b"PCSE00000");
+    fn psm_zrif_decodes_with_1024_bytes() {
+        let encoded = zrif_string_at(CONTENT_ID, 1024, 0x50);
+        let decoded = zrif_decode(&encoded, 1024).expect("zRIF PSM");
+        assert_eq!(decoded, rif_at(CONTENT_ID, 1024, 0x50));
+        assert_eq!(&decoded[0x50..0x50 + 7], b"UP0000-");
     }
-
-    const DEFAULT: &str = "UP0000-PCSE00000_00-0000000000000000";
 }

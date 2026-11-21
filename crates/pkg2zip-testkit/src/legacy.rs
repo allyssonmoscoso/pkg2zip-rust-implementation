@@ -28,6 +28,8 @@ fn pattern(seed: u32, len: usize) -> Vec<u8> {
 
 struct Spec {
     title: String,
+    content_id: Option<&'static str>,
+    dirs: &'static [&'static str],
     content_type: u32,
     key_type: u8,
     hdr_type: u16,
@@ -68,9 +70,15 @@ fn build(spec: &Spec) -> SyntheticPkg {
     set64be(&mut out[40..48], items_size as u64);
     out[0x70..0x80].copy_from_slice(&IV);
     out[0xe7] = spec.key_type;
-    let serial = spec.serial.as_bytes();
-    let serial_len = serial.len().min(9);
-    out[0x37..0x37 + serial_len].copy_from_slice(&serial[..serial_len]);
+    if let Some(content_id) = spec.content_id {
+        let bytes = content_id.as_bytes();
+        let len = bytes.len().min(0x30);
+        out[0x30..0x30 + len].copy_from_slice(&bytes[..len]);
+    } else {
+        let serial = spec.serial.as_bytes();
+        let serial_len = serial.len().min(9);
+        out[0x37..0x37 + serial_len].copy_from_slice(&serial[..serial_len]);
+    }
 
     set32be(&mut out[META_OFFSET..META_OFFSET + 4], 2);
     set32be(&mut out[META_OFFSET + 4..META_OFFSET + 8], 8);
@@ -98,7 +106,11 @@ fn build(spec: &Spec) -> SyntheticPkg {
         );
         set64be(&mut table[entry + 16..entry + 24], data.len() as u64);
         table[entry + 24] = 0x90;
-        table[entry + 27] = 0;
+        table[entry + 27] = if spec.dirs.contains(&name.as_str()) {
+            4
+        } else {
+            0
+        };
     }
     ctr_xor(&keys.main, &IV, 0, &mut table).expect("CTR tabla");
     enc[..table_size].copy_from_slice(&table);
@@ -167,6 +179,8 @@ pub fn build_psp() -> SyntheticPkg {
     let disc_id = "UCUS98616";
     build(&Spec {
         title: title.to_owned(),
+        content_id: None,
+        dirs: &[],
         content_type: 0x07,
         key_type: 1,
         hdr_type: 0,
@@ -191,6 +205,8 @@ pub fn build_psp() -> SyntheticPkg {
 pub fn build_psx() -> SyntheticPkg {
     build(&Spec {
         title: "Synthetic PSX".to_owned(),
+        content_id: None,
+        dirs: &[],
         content_type: 0x06,
         key_type: 1,
         hdr_type: 0,
@@ -214,6 +230,8 @@ pub fn build_psx() -> SyntheticPkg {
 pub fn build_ps3() -> SyntheticPkg {
     build(&Spec {
         title: "UCUS98616".to_owned(),
+        content_id: None,
+        dirs: &[],
         content_type: 0x01,
         key_type: 4,
         hdr_type: 1,
@@ -222,6 +240,30 @@ pub fn build_ps3() -> SyntheticPkg {
             "UCUS98616/DOCUMENT.DAT".to_owned(),
             pattern(0x9999_aaaa, 512),
         )],
+    })
+}
+
+/// PSM con `CONTENT_ID` en la cabecera y items bajo `content/`.
+#[must_use]
+pub fn build_psm() -> SyntheticPkg {
+    let content_id = "UP0000-PCSE00000_00-0000000000000000";
+    build(&Spec {
+        title: String::new(),
+        content_id: Some(content_id),
+        dirs: &["content/runtime"],
+        content_type: 0x18,
+        key_type: 3,
+        hdr_type: 0,
+        serial: "PCSE00000",
+        items: vec![
+            ("content/runtime".to_owned(), Vec::new()),
+            (
+                "content/runtime/lib.elf".to_owned(),
+                pattern(0x2468_ace0, 512),
+            ),
+            ("content/data.bin".to_owned(), pattern(0x1357_9bdf, 256)),
+            ("content/asset.bin".to_owned(), pattern(0x0f1e_2d3c, 128)),
+        ],
     })
 }
 

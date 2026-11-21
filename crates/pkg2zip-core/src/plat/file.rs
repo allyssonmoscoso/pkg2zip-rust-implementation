@@ -229,6 +229,11 @@ fn write_all_at(file: &File, mut data: &[u8], mut offset: u64) -> io::Result<()>
     Ok(())
 }
 
+/// Cerrojo para tests que cambian el directorio de trabajo del proceso (los tests corren en
+/// paralelo y `set_current_dir` es global).
+#[cfg(test)]
+pub(crate) static CWD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Interfaz mínima de salida para el flujo de desempaquetado.
 ///
 /// La implementa la CLI (que decide si hay TTY, `-q`, etc.). El núcleo solo emite mensajes; nunca
