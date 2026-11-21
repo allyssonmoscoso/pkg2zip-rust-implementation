@@ -157,8 +157,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 && \
-            gh release upload "${GITHUB_REF_NAME}" dist/* --clobber || \
+          gh release view "${GITHUB_REF_NAME}" -R "${GITHUB_REPOSITORY}" >/dev/null 2>&1 && \
+            gh release upload "${GITHUB_REF_NAME}" dist/* -R "${GITHUB_REPOSITORY}" --clobber || \
             gh release create "${GITHUB_REF_NAME}" dist/* \
+              -R "${GITHUB_REPOSITORY}" \
               --title "pkg2zip ${GITHUB_REF_NAME}" \
               --generate-notes
