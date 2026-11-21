@@ -126,10 +126,10 @@ pub fn parse(bytes: &[u8]) -> Result<Sfo> {
         sfo.disc_id = Some(string_value(bytes, values_offset, index)?);
     }
     if let Some(index) = minver_index {
-        sfo.min_version = Some(version_value(bytes, values_offset, index)?);
+        sfo.min_version = Some(min_version_value(bytes, values_offset, index)?);
     }
     if let Some(index) = pkgver_index {
-        sfo.app_ver = Some(version_value(bytes, values_offset, index)?);
+        sfo.app_ver = Some(app_version_value(bytes, values_offset, index)?);
     }
 
     Ok(sfo)
@@ -146,12 +146,17 @@ fn string_value(bytes: &[u8], values_offset: usize, index: usize) -> Result<Stri
     Ok(String::from_utf8_lossy(&raw[..raw.len().min(MAX_STRING_LEN)]).into_owned())
 }
 
-fn version_value(bytes: &[u8], values_offset: usize, index: usize) -> Result<String> {
+/// `APP_VER`: se salta el cero inicial, sin recortar el final (como el C).
+fn app_version_value(bytes: &[u8], values_offset: usize, index: usize) -> Result<String> {
     let raw = value(bytes, values_offset, index)?;
-    let mut raw = raw;
-    if raw.first() == Some(&b'0') {
-        raw = &raw[1..];
-    }
+    let raw = raw.strip_prefix(b"0").unwrap_or(raw);
+    Ok(String::from_utf8_lossy(raw).into_owned())
+}
+
+/// `PSP2_DISP_VER`: se salta el cero inicial y se recorta un cero final (como el C).
+fn min_version_value(bytes: &[u8], values_offset: usize, index: usize) -> Result<String> {
+    let raw = value(bytes, values_offset, index)?;
+    let raw = raw.strip_prefix(b"0").unwrap_or(raw);
     let mut out = raw.to_vec();
     if out.last() == Some(&b'0') {
         out.pop();
@@ -267,7 +272,7 @@ mod tests {
         assert_eq!(parsed.title(), "Mi Juego");
         assert_eq!(parsed.content_id(), "UP0000-PCSE00000_00-0000000000000000");
         assert_eq!(parsed.category(), "gd");
-        assert_eq!(parsed.app_ver.as_deref(), Some("1.0"));
+        assert_eq!(parsed.app_ver.as_deref(), Some("1.00"));
         assert_eq!(parsed.min_version.as_deref(), Some("3.61"));
         assert_eq!(parsed.disc_id.as_deref(), Some("PCSE00000"));
     }
@@ -316,8 +321,14 @@ mod tests {
     }
 
     #[test]
-    fn trims_version_zeros_like_c() {
-        let sfo = build(&[("TITLE", "X"), ("APP_VER", "01.00")]);
-        assert_eq!(parse(&sfo).expect("SFO").app_ver.as_deref(), Some("1.0"));
+    fn trims_versions_like_c() {
+        let sfo = build(&[("TITLE", "X"), ("APP_VER", "02.10")]);
+        assert_eq!(parse(&sfo).expect("SFO").app_ver.as_deref(), Some("2.10"));
+
+        let sfo = build(&[("TITLE", "X"), ("PSP2_DISP_VER", "03.60")]);
+        assert_eq!(
+            parse(&sfo).expect("SFO").min_version.as_deref(),
+            Some("3.6")
+        );
     }
 }

@@ -3,6 +3,7 @@
 pub mod header;
 pub mod kind;
 pub mod meta;
+pub mod naming;
 pub mod region;
 pub mod sfo;
 

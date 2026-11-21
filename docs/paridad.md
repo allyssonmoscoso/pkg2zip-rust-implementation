@@ -107,6 +107,31 @@ La fase F1 añade la cripto, checksums, zRIF y parsers de formato, con 69 tests 
 **Limitación conocida:** no hay zRIF reales en el repositorio. Los vectores de zRIF son sintéticos
 (generados con `miniz_oxide` y cabecera con diccionario). Cuando haya muestras reales se añadirán a
 `testdata/zrif/` (gitignored) y un test las consumirá si existen.
+## Baseline F2 (2026-11-20)
+
+F2 añade el escritor ZIP, la CLI compatible y los cuatro tipos de Vita. El arnés pasa a
+**15 casos** por corrida:
+
+| Caso | Compara |
+|---|---|
+| `list` | stdout de `-l` byte a byte |
+| `extract` | árbol de `-x` (rutas + SHA-256) y stdout estricto salvo el banner |
+| `zip` | entradas del zip (nombre, CRC, tamaño y SHA-256) y stdout |
+| `zrif` | igual que `extract` añadiendo el zRIF (`work.bin`) |
+
+Corpus actual: `vita_app`, `vita_patch`, `vita_dlc` y `vita_theme`. Los zRIF se generan como
+flujos zlib con diccionario y bloque `stored` (no hace falta un compresor).
+
+Resultado: `15 passed, 0 pending, 0 failed`. El ZIP coincide con el del C en entradas y contenido;
+los timestamps DOS pueden diferir porque el C usa hora local y Rust UTC (no se comparan).
+
+Notas:
+
+- `APP_VER` se conserva tal cual (`2.10`) y `PSP2_DISP_VER` recorta un cero final (`3.60` → `3.6`),
+  replicando la lógica del C.
+- PSM/Android sigue pendiente (F4); el arnés marcará esos casos como `pending` cuando exista el
+  fixture.
+
 ## Congelación de `upstream`
 
 - Repositorio original: <https://github.com/lusid1/pkg2zip>
@@ -117,7 +142,7 @@ La fase F1 añade la cripto, checksums, zRIF y parsers de formato, con 69 tests 
 
 | Fase | Se añade a la comparación |
 |---|---|
-| F2 | ZIP (entradas + CRC), stdout estricto en `-x`, fixtures DLC/PATCH/PSM/tema |
+| F2 | ZIP (entradas + CRC), stdout estricto en `-x`, fixtures APP/PATCH/DLC/THEME y zRIF |
 | F3 | PSP/PSX: ISO byte a byte, CSO (contenido + índice), EDAT, KEYS.BIN |
 | F4 | Todos los tipos y flags (`-b`, `-p`, `-d`, `-a`, `-cN`), errores y stderr |
 | F5 | Matriz final como *gate* de release |

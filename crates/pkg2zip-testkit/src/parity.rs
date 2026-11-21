@@ -94,16 +94,29 @@ pub struct Options {
 struct Case {
     name: &'static str,
     args: &'static [&'static str],
+    with_zrif: bool,
 }
 
 const CASES: &[Case] = &[
     Case {
         name: "list",
         args: &["-l"],
+        with_zrif: false,
     },
     Case {
         name: "extract",
         args: &["-x"],
+        with_zrif: false,
+    },
+    Case {
+        name: "zip",
+        args: &[],
+        with_zrif: false,
+    },
+    Case {
+        name: "zrif",
+        args: &["-x"],
+        with_zrif: true,
     },
 ];
 
@@ -120,13 +133,20 @@ fn normalize(bytes: &[u8]) -> String {
         .replace('\r', "\n")
 }
 
-fn run_bin(bin: &Path, args: &[&str], pkg: &Path, cwd: &Path) -> Result<Outcome> {
+fn run_bin(
+    bin: &Path,
+    args: &[&str],
+    pkg: &Path,
+    cwd: &Path,
+    zrif: Option<&str>,
+) -> Result<Outcome> {
     if !bin.is_file() {
         return Err(format!("no existe el binario {}", bin.display()).into());
     }
     let output = Command::new(bin)
         .args(args)
         .arg(pkg)
+        .args(zrif)
         .current_dir(cwd)
         .output()
         .map_err(|e| format!("no se pudo ejecutar {}: {e}", bin.display()))?;
@@ -211,6 +231,47 @@ fn is_pending(outcome: &Outcome) -> bool {
     outcome.code == Some(RUST_PENDING_EXIT_CODE)
 }
 
+/// Sustituye la línea del banner (`pkg2zip v2.6` vs `pkg2zip v3.0.0`) para comparar stdout.
+fn normalize_version(text: &str) -> String {
+    text.lines()
+        .map(|line| {
+            if line.starts_with("pkg2zip v") {
+                "pkg2zip vVERSION"
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn find_zip(dir: &Path) -> Result<PathBuf> {
+    let mut zips: Vec<PathBuf> = fs::read_dir(dir)?
+        .filter_map(std::result::Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "zip"))
+        .collect();
+    zips.sort();
+    match zips.len() {
+        1 => Ok(zips.remove(0)),
+        0 => Err(format!("no se generó ningún zip en {}", dir.display()).into()),
+        _ => Err(format!("se generaron varios zips en {}", dir.display()).into()),
+    }
+}
+
+fn zip_snapshot(dir: &Path) -> Result<BTreeMap<String, String>> {
+    let entries = crate::zipfile::snapshot(&find_zip(dir)?)?;
+    Ok(entries
+        .into_iter()
+        .map(|(name, info)| {
+            (
+                format!("f:{name}"),
+                format!("{:08x} {} {}", info.crc, info.size, info.sha256),
+            )
+        })
+        .collect())
+}
+
 /// Ejecuta la matriz completa y escribe el reporte JSON.
 ///
 /// # Errors
@@ -258,11 +319,32 @@ pub fn run(options: &Options) -> Result<Summary> {
             let legacy_dir = TempDir::new()?;
             let rust_dir = TempDir::new()?;
 
-            let legacy_out = run_bin(&legacy, case.args, fixture, legacy_dir.path())?;
-            let rust_out = run_bin(&rust, case.args, fixture, rust_dir.path())?;
+            let zrif_text = if case.with_zrif {
+                let path = fixture.with_extension("zrif");
+                match fs::read_to_string(&path) {
+                    Ok(text) => Some(text.trim().to_owned()),
+                    Err(_) => continue, // el fixture no tiene zRIF (p. ej. PATCH)
+                }
+            } else {
+                None
+            };
+
+            let legacy_out = run_bin(
+                &legacy,
+                case.args,
+                fixture,
+                legacy_dir.path(),
+                zrif_text.as_deref(),
+            )?;
+            let rust_out = run_bin(
+                &rust,
+                case.args,
+                fixture,
+                rust_dir.path(),
+                zrif_text.as_deref(),
+            )?;
 
             let mut details = Vec::new();
-            let mut warnings = Vec::new();
 
             let status = if is_pending(&rust_out) {
                 Status::Pending
@@ -276,40 +358,51 @@ pub fn run(options: &Options) -> Result<Summary> {
                 }
                 Status::Fail
             } else if legacy_out.code == Some(0) {
-                if case.name == "list" {
-                    if legacy_out.stdout != rust_out.stdout {
-                        details.push(format!(
-                            "stdout distinto: C={:?} Rust={:?}",
-                            legacy_out.stdout.trim_end(),
-                            rust_out.stdout.trim_end()
-                        ));
-                        Status::Fail
-                    } else {
-                        Status::Pass
+                if normalize_version(&legacy_out.stdout) != normalize_version(&rust_out.stdout) {
+                    details.push(format!(
+                        "stdout distinto: C={:?} Rust={:?}",
+                        legacy_out.stdout.trim_end(),
+                        rust_out.stdout.trim_end()
+                    ));
+                }
+
+                let mut diffs = match case.name {
+                    "zip" => {
+                        let left = zip_snapshot(legacy_dir.path())?;
+                        let right = zip_snapshot(rust_dir.path())?;
+                        diff_snapshots(&left, &right)
                     }
-                } else {
-                    let left = snapshot(legacy_dir.path())?;
-                    let right = snapshot(rust_dir.path())?;
-                    if left.is_empty() {
-                        details.push("el binario C no generó archivos".to_owned());
-                    }
-                    let mut diffs = diff_snapshots(&left, &right);
-                    if diffs.is_empty() {
-                        if legacy_out.stdout != rust_out.stdout {
-                            warnings.push("stdout distinto (se endurece en F2)".to_owned());
+                    "extract" | "zrif" => {
+                        let left = snapshot(legacy_dir.path())?;
+                        let right = snapshot(rust_dir.path())?;
+                        if left.is_empty() {
+                            details.push("el binario C no generó archivos".to_owned());
                         }
-                        Status::Pass
-                    } else {
-                        details.append(&mut diffs);
-                        Status::Fail
+                        diff_snapshots(&left, &right)
                     }
+                    _ => Vec::new(),
+                };
+
+                if details.is_empty() && diffs.is_empty() {
+                    Status::Pass
+                } else {
+                    details.append(&mut diffs);
+                    Status::Fail
                 }
             } else {
-                // Ambos fallan con el mismo código: por ahora se acepta.
+                // Ambos fallan con el mismo código: por ahora se comprueba el stderr exacto.
                 if legacy_out.stderr != rust_out.stderr {
-                    warnings.push("stderr distinto en caso de error".to_owned());
+                    details.push(format!(
+                        "stderr distinto en error: C={:?} Rust={:?}",
+                        legacy_out.stderr.trim_end(),
+                        rust_out.stderr.trim_end()
+                    ));
                 }
-                Status::Pass
+                if details.is_empty() {
+                    Status::Pass
+                } else {
+                    Status::Fail
+                }
             };
 
             cases.push(CaseResult {
@@ -317,7 +410,7 @@ pub fn run(options: &Options) -> Result<Summary> {
                 case: case.name.to_owned(),
                 status,
                 details: truncate(details, 15),
-                warnings,
+                warnings: Vec::new(),
             });
         }
     }

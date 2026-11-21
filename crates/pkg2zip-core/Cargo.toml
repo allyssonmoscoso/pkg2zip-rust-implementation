@@ -15,6 +15,7 @@ ctr.workspace = true
 thiserror.workspace = true
 crc32fast.workspace = true
 cmac.workspace = true
+flate2.workspace = true
 
 [dev-dependencies]
 miniz_oxide.workspace = true

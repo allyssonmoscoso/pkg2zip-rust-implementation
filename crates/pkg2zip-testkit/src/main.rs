@@ -9,7 +9,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use pkg2zip_testkit::parity::{self, Options, Status};
-use pkg2zip_testkit::pkg::{DEFAULT_CONTENT_ID, build_vita_app};
+use pkg2zip_testkit::pkg::build_corpus;
+use pkg2zip_testkit::zrif as testkit_zrif;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -43,12 +44,20 @@ fn gen_cmd(args: &[String]) -> Result<ExitCode, String> {
     std::fs::create_dir_all(&dir)
         .map_err(|e| format!("no se pudo crear {}: {e}", dir.display()))?;
 
-    let pkg = build_vita_app("Synthetic Vita App", DEFAULT_CONTENT_ID);
-    let path = dir.join("vita_app.pkg");
-    std::fs::write(&path, &pkg.bytes)
-        .map_err(|e| format!("no se pudo escribir {}: {e}", path.display()))?;
+    for (name, pkg) in build_corpus() {
+        let path = dir.join(&name);
+        std::fs::write(&path, &pkg.bytes)
+            .map_err(|e| format!("no se pudo escribir {}: {e}", path.display()))?;
+        println!("{} ({} bytes)", path.display(), pkg.bytes.len());
 
-    println!("{} ({} bytes)", path.display(), pkg.bytes.len());
+        // El PATCH no usa work.bin; el resto sí, con un zRIF generado.
+        if name != "vita_patch.pkg" {
+            let zrif_path = path.with_extension("zrif");
+            std::fs::write(&zrif_path, testkit_zrif::zrif_string(&pkg.content_id))
+                .map_err(|e| format!("no se pudo escribir {}: {e}", zrif_path.display()))?;
+        }
+    }
+
     Ok(ExitCode::SUCCESS)
 }
 
