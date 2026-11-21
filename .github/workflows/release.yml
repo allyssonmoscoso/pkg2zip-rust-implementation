@@ -1,0 +1,164 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  native:
+    name: build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x86_64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: linux-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN="target/${{ matrix.target }}/release/pkg2zip"
+          if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then BIN="$BIN.exe"; fi
+          "$BIN" --version
+          "$BIN" --help >/dev/null
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME="pkg2zip-${GITHUB_REF_NAME}-${{ matrix.name }}"
+          mkdir -p dist package
+          cp "target/${{ matrix.target }}/release/pkg2zip" package/pkg2zip
+          cp LICENSE package/
+          tar -C package -czf "dist/${NAME}.tar.gz" .
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "pkg2zip-$env:GITHUB_REF_NAME-${{ matrix.name }}"
+          New-Item -ItemType Directory -Force dist, package | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/pkg2zip.exe" "package/pkg2zip.exe"
+          Copy-Item LICENSE "package/LICENSE"
+          Compress-Archive -Path "package/*" -DestinationPath "dist/$name.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  cross:
+    name: build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-unknown-linux-gnu
+            name: linux-aarch64
+          - target: x86_64-unknown-linux-musl
+            name: linux-x86_64-musl
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Build con cross
+        uses: houseabsolute/actions-rust-cross@v1
+        with:
+          command: build
+          target: ${{ matrix.target }}
+          args: "--release --locked"
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME="pkg2zip-${GITHUB_REF_NAME}-${{ matrix.name }}"
+          mkdir -p dist package
+          cp "target/${{ matrix.target }}/release/pkg2zip" package/pkg2zip
+          cp LICENSE package/
+          tar -C package -czf "dist/${NAME}.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  macos:
+    name: build (macos-universal)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: Build (arm64 + x86_64) y universal
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --locked --target aarch64-apple-darwin
+          cargo build --release --locked --target x86_64-apple-darwin
+          lipo -create \
+            target/aarch64-apple-darwin/release/pkg2zip \
+            target/x86_64-apple-darwin/release/pkg2zip \
+            -output pkg2zip-universal
+          ./pkg2zip-universal --version
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME="pkg2zip-${GITHUB_REF_NAME}-macos-universal"
+          mkdir -p dist package
+          cp pkg2zip-universal package/pkg2zip
+          cp LICENSE package/
+          tar -C package -czf "dist/${NAME}.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: publish release
+    needs: [native, cross, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+      - name: Crear release con gh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 && \
+            gh release upload "${GITHUB_REF_NAME}" dist/* --clobber || \
+            gh release create "${GITHUB_REF_NAME}" dist/* \
+              --title "pkg2zip ${GITHUB_REF_NAME}" \
+              --generate-notes

@@ -5,7 +5,7 @@
 | Documento | Plan de migración completa a Rust |
 | Rama de trabajo | `develop` (creada desde `master` en `6ee3df5`) |
 | Versión objetivo | `pkg2zip 3.0.0` (reescritura; reemplaza a 2.6) |
-| Estado | **F4 completada** (PSM, casos límite y matriz de 92 casos). Siguiente: F5 (release 3.0.0) |
+| Estado | **3.0.0 publicada** (F0–F5 completadas; C archivado en `v2.6-c-final`) |
 | Fecha | 2026-11-20 |
 | Alcance | Reemplazar el 100 % del C por Rust, sin dependencia de compilador de C, con binarios para Windows/Linux/macOS y paridad funcional con 2.6 |
 
@@ -650,15 +650,17 @@ muestra real.
 
 ### F5 — Multiplataforma, documentación y retirada del C (3 días)
 
-- [ ] `release.yml`: matriz de targets, artefactos, `SHA256SUMS`, smoke tests por SO.
-- [ ] `README.md` reescrito (instalación con `cargo install`, binarios, uso, diferencias con 2.6).
-- [ ] `CHANGELOG.md` 3.0.0; `CONTRIBUTING.md`; plantilla de PR.
-- [ ] Borrar `legacy/`, `makefile`, `build.cmd`, `build32.cmd`, `.travis.yml`, `.appveyor.yml`,
-      `cmake-multi-platform.yml`, `flake.nix` (o reescribir el flake para Rust).
-- [ ] `cargo deny`, `cargo audit`, `cargo machete` en CI; MSRV declarada.
-- [ ] Tag `v3.0.0`; merge `develop → master`; archivar el C en tag `v2.6-c-final`.
+- [x] `release.yml`: 5 artefactos (Windows x86_64, Linux gnu y musl x86_64, Linux aarch64, macOS
+      universal), `SHA256SUMS` y smoke tests en los targets nativos.
+- [x] `README.md` reescrito, `CHANGELOG.md` 3.0.0, `CONTRIBUTING.md` y plantilla de PR.
+- [x] Eliminados `legacy/` (C, makefile, `build*.cmd`, CI histórico, flake) y `scripts/build-legacy`;
+      el oráculo queda archivado en el tag `v2.6-c-final`.
+- [x] CI: MSRV 1.89, `cargo-deny`, `cargo-machete` y guardia `no-c`; el job de paridad se retira
+      del CI pero el arnés sigue disponible contra el tag.
+- [x] Tag `v2.6-c-final`, merge `develop → master` y tag `v3.0.0` con release de binarios.
 
 **Compuerta F5 (Definition of Done):** ver §12.
+
 
 ### F6 — Mejoras opcionales (3 días)
 
@@ -940,3 +942,4 @@ act -j test -P ubuntu-latest=catthehacker/ubuntu:act-latest
 | 2026-11-20 | F2 ejecutada: ZIP/ZIP64, CLI compatible, layouts APP/PATCH/DLC/THEME, work.bin, extras y PDB; paridad 15/15 |
 | 2026-11-20 | F3 ejecutada: PSP/PSX/PS3, ISO/CSO, LZRC, EDAT/KEYS.BIN, tema PSP; paridad 29/29 |
 | 2026-11-20 | F4 ejecutada: PSM/Android, casos límite, zRIF `.bin`/mismatch y matriz de 92 casos |
+| 2026-11-20 | F5 ejecutada: release multiplataforma, documentación final, retirada del C y tag `v3.0.0` |

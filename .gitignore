@@ -17,6 +17,9 @@ Cargo.lock.bak
 /corpus/
 *.pkg
 
+# Artefactos de build/release
+/dist/
+
 # Artefactos de salida de pruebas
 *.cso
 /cso-test-*

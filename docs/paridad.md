@@ -1,11 +1,12 @@
 # Protocolo de paridad C ↔ Rust
 
 Este documento describe cómo se verifica que la reescritura en Rust se comporta **igual** que la
-implementación C de `legacy/`, y registra los resultados de cada fase.
+implementación C, y registra los resultados de cada fase. El C está archivado en el tag
+`v2.6-c-final` y se construye con `make` desde un `git worktree`.
 
 ## Principio
 
-El binario C congelado es el **oráculo**. El arnés ejecuta ambos binarios sobre el mismo PKG, en
+El binario C archivado es el **oráculo**. El arnés ejecuta ambos binarios sobre el mismo PKG, en
 directorios temporales separados, y compara lo observable:
 
 | Dimensión | Comparación |
@@ -37,20 +38,22 @@ error de cripto rompe ambos lados de la comparación de forma simétrica y detec
 ## Cómo ejecutarlo
 
 ```powershell
-# 1. Binario C de referencia (Windows; en Linux/macOS usar scripts/build-legacy.sh)
-pwsh ./scripts/build-legacy.ps1
+# 1. Binario C de referencia desde el tag archivado
+git worktree add ../pkg2zip-c v2.6-c-final
+make -C ../pkg2zip-c          # en Windows: mingw32-make, o compilar con MSVC
 
 # 2. Corpus sintético
 pwsh ./scripts/gen-corpus.ps1
 
 # 3. Arnés (compila el testkit y compara)
-pwsh ./scripts/parity.ps1
+pwsh ./scripts/parity.ps1 -Legacy ../pkg2zip-c/pkg2zip.exe
 ```
 
 ```sh
-./scripts/build-legacy.sh
+git worktree add ../pkg2zip-c v2.6-c-final
+make -C ../pkg2zip-c
 ./scripts/gen-corpus.sh
-./scripts/parity.sh
+./scripts/parity.sh target/corpus ../pkg2zip-c/pkg2zip
 ```
 
 El reporte queda en `target/parity.json`:
@@ -58,19 +61,19 @@ El reporte queda en `target/parity.json`:
 ```json
 {
   "tool_version": "3.0.0",
-  "legacy": "target/legacy/pkg2zip.exe",
-  "rust": "target/debug/pkg2zip.exe",
-  "passed": 0,
-  "pending": 2,
+  "legacy": "../pkg2zip-c/pkg2zip",
+  "rust": "target/debug/pkg2zip",
+  "passed": 92,
+  "pending": 0,
   "failed": 0,
   "cases": [
-    { "fixture": "vita_app.pkg", "case": "list", "status": "pending", "details": [], "warnings": [] }
+    { "fixture": "vita_app.pkg", "case": "list", "status": "pass", "details": [], "warnings": [] }
   ]
 }
 ```
 
-El proceso sale con `1` si hay algún caso `fail`; los `pending` no rompen CI (pero deben bajar a cero
-al final de cada fase).
+El proceso sale con `1` si hay algún caso `fail`; los `pending` solo aparecen mientras una fase está
+a medias.
 
 ## Baseline F0 (2026-11-20)
 
