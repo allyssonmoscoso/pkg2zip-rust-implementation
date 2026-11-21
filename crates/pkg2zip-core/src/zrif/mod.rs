@@ -145,23 +145,26 @@ pub fn zlib_inflate_dict(input: &[u8], capacity: usize) -> Result<Vec<u8>> {
     if input.len() < offset + 4 {
         return Err(Error::ZrifTooShort);
     }
-    let adler_offset = input.len() - 4;
-    if adler_offset <= offset {
+    // El flujo zlib real lleva el Adler-32 justo después de los datos deflate, y puede haber
+    // padding (hasta 2 bytes) al final del base64. Por eso la posición del checksum se obtiene
+    // de lo que consumió el inflate, no de `input.len() - 4`.
+    let inflated = puff::inflate_with_dict(dict, &input[offset..], capacity)
+        .map_err(|_| Error::ZrifInflate)?;
+    let adler_offset = offset + inflated.consumed;
+    if adler_offset + 4 > input.len() {
         return Err(Error::ZrifTooShort);
     }
-    let payload = &input[offset..adler_offset];
     let expected_adler = u32::from_be_bytes(
-        input[adler_offset..]
+        input[adler_offset..adler_offset + 4]
             .try_into()
-            .expect("los últimos 4 bytes son el Adler-32"),
+            .expect("4 bytes"),
     );
 
-    let out = puff::inflate_with_dict(dict, payload, capacity).map_err(|_| Error::ZrifInflate)?;
-    if adler32(&out) != expected_adler {
+    if adler32(&inflated.data) != expected_adler {
         return Err(Error::ZrifChecksum);
     }
 
-    Ok(out)
+    Ok(inflated.data)
 }
 
 #[cfg(test)]
@@ -311,6 +314,28 @@ mod tests {
         let data = payload();
         let encoded = base64_encode(&zlib_stream(&data, 6, true));
         assert!(matches!(zrif_decode(&encoded, 1024), Err(Error::ZrifSize)));
+    }
+
+    /// zRIF real de la base pública de NoPayStation (PCSG00312). Este caso fallaba porque el
+    /// stream lleva 2 bytes de padding después del Adler-32 y el checksum no está en `len-4`.
+    #[test]
+    fn decodes_real_zrif_with_trailing_padding() {
+        const ZRIF: &str = "KO5ifR1dg/J5YXyvAJBLoLYYGxqB7A/3MjH1Cg4LC3YMcgwI8PHE5z9R2VQZhsSbzzP9pCRfuDp5jcb44AYA4XESlAAA";
+        let rif = zrif_decode(ZRIF, 512).expect("zRIF real");
+        assert_eq!(rif.len(), 512);
+        assert_eq!(
+            &rif[0x10..0x10 + 36],
+            b"JP0700-PCSG00312_00-WJ45JSVVSARAPPLI"
+        );
+    }
+
+    #[test]
+    fn ignores_padding_after_the_checksum() {
+        let data = payload();
+        let mut raw = zlib_stream(&data, 6, true);
+        raw.extend_from_slice(&[0, 0]);
+        let encoded = base64_encode(&raw);
+        assert_eq!(zrif_decode(&encoded, data.len()).expect("padding"), data);
     }
 
     #[test]

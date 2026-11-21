@@ -32,18 +32,18 @@ Download the archive for your platform from the
 
 | Platform | File |
 |---|---|
-| Windows x86_64 | `pkg2zip-v3.0.0-windows-x86_64.zip` |
-| Linux x86_64 | `pkg2zip-v3.0.0-linux-x86_64.tar.gz` |
-| Linux x86_64 (static musl) | `pkg2zip-v3.0.0-linux-x86_64-musl.tar.gz` |
-| Linux aarch64 | `pkg2zip-v3.0.0-linux-aarch64.tar.gz` |
-| macOS (universal) | `pkg2zip-v3.0.0-macos-universal.tar.gz` |
+| Windows x86_64 | `pkg2zip-v3.0.1-windows-x86_64.zip` |
+| Linux x86_64 | `pkg2zip-v3.0.1-linux-x86_64.tar.gz` |
+| Linux x86_64 (static musl) | `pkg2zip-v3.0.1-linux-x86_64-musl.tar.gz` |
+| Linux aarch64 | `pkg2zip-v3.0.1-linux-aarch64.tar.gz` |
+| macOS (universal) | `pkg2zip-v3.0.1-macos-universal.tar.gz` |
 
 Every release ships `SHA256SUMS`.
 
 ### From source
 
 ```sh
-cargo install --git https://github.com/allyssonmoscoso/pkg2zip-rust-implementation --tag v3.0.0
+cargo install --git https://github.com/allyssonmoscoso/pkg2zip-rust-implementation --tag v3.0.1
 ```
 
 or, from a checkout:
@@ -138,6 +138,8 @@ The observable contract is intentionally unchanged. The only differences:
 
 ## Verification
 
+* **zRIF**: validated against 3.703 real licenses from the NoPayStation Vita database (padding after
+  the Adler-32 included) and end-to-end against the C binary.
 * **92 differential cases** against the frozen C binary: `list`, `extract`, `zip`, `zrif`,
   `zrif-bin`, `zrif-mismatch`, `psp-pbp`, `no-bgdl`, `quiet` and `android`, over 12 synthetic
   fixtures. Output trees, ZIP entries/CRC/SHA-256 and stdout are compared.
