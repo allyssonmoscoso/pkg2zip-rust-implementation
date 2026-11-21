@@ -3,13 +3,16 @@
 //! Este crate no conoce la CLI ni la consola: recibe rutas y devuelve [`Result`]. La capa
 //! `pkg2zip-cli` traduce errores a mensajes y códigos de salida.
 //!
-//! Estado de la migración: Fase 0 (esqueleto + AES/CTR). Ver `docs/PLAN-MIGRACION-RUST.md`.
+//! Estado de la migración: Fase 1 (cripto, checksums, zRIF y parsers de formato).
 
 #![deny(unsafe_code)]
 
 pub mod bytes;
+pub mod checksum;
 pub mod crypto;
 pub mod error;
+pub mod pkg;
+pub mod zrif;
 
 pub use error::{Error, Result};
 

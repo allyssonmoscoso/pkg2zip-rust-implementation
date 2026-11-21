@@ -19,6 +19,9 @@ aes = "=0.9.4"
 cipher = "=0.5.2"
 ctr = "=0.10.1"
 thiserror = "=2.0.21"
+crc32fast = "=1.5.5"
+cmac = "=0.8.0"
+miniz_oxide = "=0.9.1"
 
 sha2 = "=0.11.1"
 serde = { version = "=1.0.229", features = ["derive"] }
